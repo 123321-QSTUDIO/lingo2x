@@ -1,0 +1,93 @@
+{
+  "MODEL 骨架": {
+    "prefix": "model",
+    "description": "完整模型骨架（SETS + DATA + 目标）",
+    "body": [
+      "MODEL:",
+      "",
+      "SETS:",
+      "\t${1:ITEMS} /${2:A, B, C}/: ${3:VALUE}, X;",
+      "ENDSETS",
+      "",
+      "DATA:",
+      "\t${3:VALUE} = ${4:1, 2, 3};",
+      "ENDDATA",
+      "",
+      "${5:MAX} = @SUM(${1:ITEMS}(${6:i}): ${3:VALUE}(${6:i}) * X(${6:i}));",
+      "$0",
+      "END"
+    ]
+  },
+  "SETS 段": {
+    "prefix": "sets",
+    "description": "集合定义段",
+    "body": [
+      "SETS:",
+      "\t${1:NAME} /${2:m1, m2}/: ${3:attr};",
+      "\t${4:LINK}(${1:NAME}, ${1:NAME}): ${5:attr2};",
+      "ENDSETS"
+    ]
+  },
+  "DATA 段": {
+    "prefix": "data",
+    "description": "数据段",
+    "body": [
+      "DATA:",
+      "\t${1:param} = ${2:v1, v2};",
+      "ENDDATA"
+    ]
+  },
+  "@FOR 循环约束": {
+    "prefix": "for",
+    "description": "@FOR(SET(i): 约束)",
+    "body": ["@FOR(${1:SET}(${2:i}): ${3:constraint});"]
+  },
+  "@FOR 条件约束": {
+    "prefix": "forif",
+    "description": "@FOR(SET(i) | 条件: 约束)",
+    "body": ["@FOR(${1:SET}(${2:i}) | ${2:i} #GE# ${3:1}: ${4:constraint});"]
+  },
+  "@SUM 求和": {
+    "prefix": "sum",
+    "description": "@SUM(SET(i): 表达式)",
+    "body": ["@SUM(${1:SET}(${2:i}): ${3:expr})"]
+  },
+  "@SUM 条件求和": {
+    "prefix": "sumif",
+    "description": "@SUM(SET(i) | 条件: 表达式)",
+    "body": ["@SUM(${1:SET}(${2:i}) | ${2:i} #LE# ${3:n}: ${4:expr})"]
+  },
+  "@BIN 0-1 变量": {
+    "prefix": "bin",
+    "description": "整族声明 0-1 变量",
+    "body": ["@FOR(${1:SET}(${2:i}): @BIN(${3:X}(${2:i})));"]
+  },
+  "@GIN 整数变量": {
+    "prefix": "gin",
+    "description": "整族声明整数变量",
+    "body": ["@FOR(${1:SET}(${2:i}): @GIN(${3:X}(${2:i})));"]
+  },
+  "运输问题骨架": {
+    "prefix": "transport",
+    "description": "经典运输问题完整模板",
+    "body": [
+      "MODEL:",
+      "SETS:",
+      "\tWAREHOUSES /${1:W1, W2}/: CAP;",
+      "\tCUSTOMERS  /${2:C1, C2, C3}/: DEMAND;",
+      "\tLINKS(WAREHOUSES, CUSTOMERS): COST, X;",
+      "ENDSETS",
+      "",
+      "DATA:",
+      "\tCAP    = ${3:60, 55};",
+      "\tDEMAND = ${4:35, 40, 30};",
+      "\tCOST   = ${5:8, 6, 10, 9, 12, 13};",
+      "ENDDATA",
+      "",
+      "MIN = @SUM(LINKS(I, J): COST(I, J) * X(I, J));",
+      "@FOR(WAREHOUSES(I): @SUM(CUSTOMERS(J): X(I, J)) <= CAP(I));",
+      "@FOR(CUSTOMERS(J):  @SUM(WAREHOUSES(I): X(I, J)) >= DEMAND(J));",
+      "END"
+    ]
+  }
+}

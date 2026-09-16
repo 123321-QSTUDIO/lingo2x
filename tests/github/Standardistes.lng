@@ -1,0 +1,37 @@
+!ENONCE:
+Une compagnie téléphonique doit planifier l’horaire des standardistes dans sa centrale téléphonique.
+Les standardistes travaillent 9 heures d’affilée, sans pauses-café ni pauses repas. Le salaire pour une
+journée de travail dépend de l’heure de début du quart de travail. La compagnie a aussi identifié
+ses besoins minimaux en standardistes pour une journée typique (voir tableau).
+Déterminer les horaires des standardistes de façon à optimiser les coûts.
+
+ Heures de début de service
+Heures 				0-3 	3-6 	6-9 	9-12	 12-15	 15-18	 18-21	 21-24
+Besoins en standardistes 	6	 4 	12	 20 	   20 	   24 	   14	   14
+Salaire 				86 	86 	75	 75	   75        75 	   80	   80
+
+;
+SETS:
+	HEURES: ch,bh,Xh;
+      TRAVAIL(HEURES, HEURES): couverture_quarts;
+ENDSETS
+
+DATA:
+	HEURES = @OLE('Standardistes.xlsx');
+
+	ch = @OLE('Standardistes.xlsx');
+	bh = @OLE('Standardistes.xlsx');
+	couverture_quarts = @OLE('Standardistes.xlsx');
+
+	@OLE('Standardistes.xlsx') = Xh;
+ENDDATA
+
+MIN = @SUM(HEURES(h): ch(h) * Xh(h) );
+
+@FOR(HEURES(h):
+	@SUM(HEURES(i): couverture_quarts(h,i) * Xh(i) ) >= bh(h)
+);
+
+@FOR(HEURES(h):
+	Xh(h) >= 0
+);

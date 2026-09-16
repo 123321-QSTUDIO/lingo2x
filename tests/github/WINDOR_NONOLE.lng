@@ -1,0 +1,30 @@
+MODEL :
+SETS:
+PRODUITS/P1, P2/: gain, x;
+USINES/U1, U2, U3/: disp;
+PRODS_USINES(USINES, PRODUITS): utilisation;
+ENDSETS
+
+DATA:
+! gain des produits ;
+gain = 3, 5;
+!disponibilite des usines;
+disp = 4, 12, 18;
+!Utilisation;
+utilisation = 
+	1, 0,
+	0, 2,
+      3, 2;
+
+ENDDATA
+
+MAX = @SUM (PRODUITS(p):
+             gain(p)*x(p)
+);
+
+@FOR(USINES(u): 
+   @SUM(PRODUITS(p):
+        utilisation(u,p)*x(p))<=disp(u)
+);
+
+END

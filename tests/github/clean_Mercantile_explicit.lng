@@ -1,0 +1,19 @@
+MODEL: 
+SETS:
+MOIS:espace;
+PERIODES:cout;
+ARC(MOIS,PERIODES):X;
+ENDSETS
+
+DATA:
+espace = 30000,20000,40000,10000,50000;
+cout = 65,100,135,160,190;
+ENDDATA
+
+!fonction objectif;
+MIN=@SUM(ARC:cout*X);
+
+!contraintes;
+@FOR(MOIS(m): @SUM(MOIS(k) | k#LE#m:@SUM(PERIODES(j) | k+j #GT#m:X(k,j)))>=espace(m));
+
+END

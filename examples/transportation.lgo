@@ -1,0 +1,17 @@
+MODEL:
+! 运输问题：2 个仓库 → 3 个客户;
+SETS:
+    WAREHOUSES /W1, W2/: CAP;
+    CUSTOMERS  /C1, C2, C3/: DEMAND;
+    LINKS(WAREHOUSES, CUSTOMERS): COST, X;
+ENDSETS
+DATA:
+    CAP    = 60, 55;
+    DEMAND = 35, 40, 30;
+    COST   = 8,  6, 10,
+             9, 12, 13;
+ENDDATA
+MIN = @SUM(LINKS(I, J): COST(I, J) * X(I, J));
+@FOR(WAREHOUSES(I): @SUM(CUSTOMERS(J): X(I, J)) <= CAP(I));
+@FOR(CUSTOMERS(J):  @SUM(WAREHOUSES(I): X(I, J)) >= DEMAND(J));
+END

@@ -1,0 +1,42 @@
+
+SETS:
+PRODUITS/1,2,3,4/:revenu,cout_dem,x,y;!x=qte a produire,y=decision de produire;
+MACHINES/1,2/:z;!z=1 si la machine fonctionne;
+ARC(MACHINES,PRODUITS):ponderation;
+ENDSETS
+
+DATA:
+bigM=1000000;!grand chiffre;
+revenu=70,60,90,80;
+cout_dem=50000,40000,70000,60000;
+ponderation=5,3,6,4,
+		4,6,3,5;
+prod_max=6000;
+ENDDATA
+
+!Fonction objectif (Profit-Revenu);
+max=@SUM(PRODUITS:revenu*x-cout_dem*y);
+
+!SAC;
+!Maximum 2 produits peuvent �tre fabriqu�s;
+@SUM(PRODUITS:y)<=2;
+
+!2 machines possibles;
+@FOR(MACHINES(m):@SUM(PRODUITS(p):ponderation(m,p)*x(p))<=prod_max+bigM*(1-z(m)));
+@SUM(MACHINES:z)=1;
+!5*x(1)+3*x(2)+6*x(3)+4*x(4)<=6000+bigM*z;
+!4*x(1)+6*x(2)+3*x(3)+5*x(4)<=6000+bigM*(1-z);
+
+!Si le produit n'est pas fabriqu�,x=0;
+@FOR(PRODUITS:x<=bigM*y);
+
+!Les produits 3 et 4 peuvent seulement �tre fabriqu�s si les produits 1 ou 2 sont fabriqu�s;
+!y(3)<=y(1)+y(2);
+!y(4)<=y(1)+y(2);
+@FOR(PRODUITS(p) | p#GE#3:y(p)<=@SUM(PRODUITS(q)|q#LE#2:y(q)));
+
+!Variables binaires;
+@FOR(PRODUITS:@BIN(y));
+@FOR(MACHINES:@BIN(z));
+!Les quantit�s � fabriquer sont enti�res;
+@FOR(PRODUITS:@GIN(x));

@@ -1,0 +1,22 @@
+MODEL :
+
+SETS:
+PERIODES: besoins;
+LOCATION(PERIODES, PERIODES) | &1 #LE# &2: couts, x;
+ENDSETS
+
+DATA:
+	besoins = @OLE('vitrex.xlsx', 'besoins');
+	couts = @OLE('vitrex.xlsx', 'couts');
+
+	@OLE('vitrex.xlsx', 'x') = x;
+ENDDATA
+
+MIN = @SUM(LOCATION(t1,t2) | t2 #GE# t1: couts(t1,t2) * x(t1,t2) );
+
+@FOR(PERIODES(t):
+  @SUM(PERIODES(t1) | t1 #LE# t: @SUM(PERIODES(t2) | t2 #GE# t: x(t1,t2) ) ) >= besoins(t)
+);
+
+
+END

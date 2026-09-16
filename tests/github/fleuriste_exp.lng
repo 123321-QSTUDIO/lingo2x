@@ -1,0 +1,13 @@
+!LE FLEURISTE  
+!Fonction objectif;  
+
+MODEL:
+
+[Revenu] MAX = 40 * X1 + 50 * X2;  
+
+!Contrainte: ne pas dépasser le nombre de fleurs disponibles;  
+10 * X1 + 10 * X2 <= 50;  
+10 * X1 + 20 * X2 <= 80;  
+20 * X1 + 10 * X2 <= 80;  
+!X1 et X2 positifs: contrainte par défaut de LINGO;  
+END

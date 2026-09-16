@@ -1,0 +1,37 @@
+MODEL:
+
+SETS:
+JOUETS/1,2/:revenu,cout_dem,x,y;!x=qte a produire,y=decision de produire;
+USINES/1,2/:prod_max,z;!z=1 si la machine fonctionne;
+ARC(USINES,JOUETS):ponderation;
+ENDSETS
+
+DATA:
+bigM=1000000;
+revenu=10,15;
+cout_dem=50000,80000;
+ponderation=0.02,0.025,
+		0.025,0.04;
+prod_max=500,700;
+ENDDATA
+
+MAX=@SUM(JOUETS(j):revenu(j)*x(j)-cout_dem(j)*y(j));
+
+! Capacité des machines
+@FOR(USINES(u): @SUM(JOUETS(j): ponderation(u,j)*x(j)) <= prod_max(u) + bigM*(1 - z(u)));
+
+! Une seule machine active
+@SUM(USINES(u): z(u)) = 1;
+
+! Lien production / décision
+@FOR(JOUETS(j): x(j) <= bigM*y(j));
+
+! Variables binaires
+@FOR(JOUETS(j): @BIN(y(j)));
+@FOR(USINES(u): @BIN(z(u)));
+
+!Les quantités à fabriquer sont entières;
+!@FOR(JOUETS:@GIN(x));
+
+
+END

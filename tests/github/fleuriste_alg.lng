@@ -1,0 +1,27 @@
+
+
+MODEL:
+
+SETS:
+!ensemble des fleurs;
+FLEURS /Lys, Roses, Jonquilles/: Dispo;
+!ensemble des bouquets;
+BOUQUETS / B1, B2 / : Prix, X;!X le nombre de bouquets, est une variable décisionnelle;
+ARCS(FLEURS,BOUQUETS):Compo;!le nombre de chaque type de fleurs dans chaque type de bouquet;
+ENDSETS
+
+DATA:
+!FLEURS= Lys, Rose, Jonquilles;! Si on préfère lister les membres de l'ensemble FLEURS ici au lieu de les mettres dans 'SETS'
+!BOUQUETS= B1, B2;
+Dispo= 50,80,80;
+Prix= 40,50;
+Compo= 10,10,
+ 	10, 20,
+	20, 10;
+
+ENDDATA
+!Fonction objectif;
+[Revenu] MAX = @SUM(BOUQUETS(b):Prix(b) * X(b));
+!Contrainte: ne pas depasser le nombre de fleurs disponibles;
+@FOR(FLEURS(f):    @SUM(  BOUQUETS(b): Compo(f,b) * X(b)  ) <=Dispo(f)      );
+END

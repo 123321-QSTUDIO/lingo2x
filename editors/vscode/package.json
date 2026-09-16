@@ -1,0 +1,73 @@
+{
+  "name": "lingo2x",
+  "displayName": "lingo2x — LINGO 开源工具链",
+  "description": "LINGO 语法高亮、代码片段、一键求解（scipy/HiGHS 或 GLPK/glpsol）、保存时语法检查",
+  "version": "0.1.0",
+  "publisher": "lingo2x",
+  "license": "MIT",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages", "Other"],
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": true }
+  },
+  "activationEvents": ["onLanguage:lingo"],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "lingo",
+        "aliases": ["LINGO", "lingo"],
+        "extensions": [".lng", ".lgo"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lingo",
+        "scopeName": "source.lingo",
+        "path": "./syntaxes/lingo.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      { "language": "lingo", "path": "./snippets/lingo.json" }
+    ],
+    "commands": [
+      { "command": "lingo2x.solveScipy", "title": "lingo2x: 求解（scipy/HiGHS）" },
+      { "command": "lingo2x.solveGlpsol", "title": "lingo2x: 求解（GLPK/glpsol）" },
+      { "command": "lingo2x.toGmpl", "title": "lingo2x: 翻译为 GMPL (.mod)" },
+      { "command": "lingo2x.toLp", "title": "lingo2x: 翻译为 LP (.lp)" }
+    ],
+    "menus": {
+      "editor/title": [
+        { "command": "lingo2x.solveScipy", "when": "editorLangId == lingo", "group": "navigation@1" },
+        { "command": "lingo2x.solveGlpsol", "when": "editorLangId == lingo", "group": "navigation@2" }
+      ],
+      "editor/context": [
+        { "command": "lingo2x.solveScipy", "when": "editorLangId == lingo", "group": "lingo2x@1" },
+        { "command": "lingo2x.solveGlpsol", "when": "editorLangId == lingo", "group": "lingo2x@2" },
+        { "command": "lingo2x.toGmpl", "when": "editorLangId == lingo", "group": "lingo2x@3" },
+        { "command": "lingo2x.toLp", "when": "editorLangId == lingo", "group": "lingo2x@4" }
+      ]
+    },
+    "configuration": {
+      "title": "lingo2x",
+      "properties": {
+        "lingo2x.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Python 解释器路径；留空则优先用 <项目根>/.venv/Scripts/python.exe，再退回 PATH 里的 python"
+        },
+        "lingo2x.glpsolPath": {
+          "type": "string",
+          "default": "",
+          "description": "glpsol.exe 路径；留空则尝试 <项目根>/tools/glpk-4.65/w64/glpsol.exe，再退回 PATH 里的 glpsol"
+        },
+        "lingo2x.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "保存/打开 .lng/.lgo 文件时自动做语法检查"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+MODEL:
+
+SETS:
+VILLES /LA,SF,SD/: gain_usine, gain_magasin, capital_usine, capital_magasin, choix_usine, choix_magasin;
+ENDSETS
+
+DATA:
+gain_usine = 9,5,7;
+gain_magasin = 6,4,5;
+capital_usine = 6,3,4;
+capital_magasin = 5,2,3;
+Dispo = 10;
+ENDDATA
+
+[FO] MAX = @SUM(VILLES(v): gain_usine(v)*choix_usine(v) + gain_magasin(v)*choix_magasin(v));
+
+! Investissement inferieur au capital disponible
+[invest] @SUM(VILLES(v): capital_magasin(v)*choix_magasin(v) + capital_usine(v)*choix_usine(v)) <= Dispo;
+
+! Pas de magasin sans usine
+@FOR(VILLES(v): choix_magasin(v) <= choix_usine(v));
+
+! Au moins une usine et au moins un magasin
+@SUM(VILLES(v): choix_magasin(v)) >= 1;
+@SUM(VILLES(v): choix_usine(v)) >= 1;
+
+! Variables binaires
+@FOR(VILLES(v): @BIN(choix_usine(v)));
+@FOR(VILLES(v): @BIN(choix_magasin(v)));
+
+END

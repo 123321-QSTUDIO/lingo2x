@@ -1,0 +1,27 @@
+MODEL :
+SETS:
+ROUTES:temps,x;
+NOEUDS:;
+ARC(NOEUDS,ROUTES):connexion;
+ENDSETS
+
+DATA:
+ROUTES,NOEUDS,temps,connexion=@OLE("delivery.xlsx");
+ENDDATA
+
+!FO:minimiser le temps total;
+[FO] MIN=@SUM(ROUTES(r):temps(r)*x(r));
+
+!SAC;
+!Tous les noeuds doivent etre desservis exactement une fois;
+@FOR(NOEUDS(n):@SUM(ROUTES(r):connexion(n,r)*x(r))=1);
+
+!les points doivent etre delivrés par trois livreurs;
+@SUM(ROUTES(r):x(r))=3;
+
+!Binaires;
+@FOR(ROUTES:@BIN(x));
+
+
+
+END

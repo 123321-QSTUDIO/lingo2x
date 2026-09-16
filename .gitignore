@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# 虚拟环境与第三方工具（体积大，可重建）
+.venv/
+tools/
+
+# 翻译器/求解器生成物
+*.mod
+*.lp
+*.sol.txt

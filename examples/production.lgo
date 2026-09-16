@@ -1,0 +1,14 @@
+MODEL:
+! 生产计划：三种产品，工时与材料两种资源约束;
+SETS:
+    PRODUCTS /A, B, C/: PROFIT, LABOR, MATERIAL, X;
+ENDSETS
+DATA:
+    PROFIT   = 3, 5, 4;
+    LABOR    = 2, 1, 3;
+    MATERIAL = 1, 3, 2;
+ENDDATA
+MAX = @SUM(PRODUCTS(I): PROFIT(I) * X(I));
+[labor]    @SUM(PRODUCTS(I): LABOR(I) * X(I))    <= 180;
+[material] @SUM(PRODUCTS(I): MATERIAL(I) * X(I)) <= 240;
+END

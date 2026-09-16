@@ -1,0 +1,43 @@
+!ENONCE:
+
+MODEL:
+
+SETS:
+CLIENTS /1,2,3/;
+PRODUCTION /0,1,2,3,4,5/;
+ARC(PRODUCTION,CLIENTS): Capacite, Revenu, X;
+ENDSETS
+
+DATA:
+Bigm = 1000000; ! grand chiffre;
+
+Revenu =
+ 0,0,0,
+ 1,1,1,
+ 2,5,3,
+ 4,0,5,
+ 0,0,6,
+ 0,0,7;
+
+Capacite =
+ 0,0,0,
+ 0.2,0.4,0.2,
+ 0.4,0.8,0.4,
+ 0.6,1.2,0.6,
+ 0.8,1.2,0.8,
+ 1,1.2,1; ! occupation >100% si Capacite depassee
+ENDDATA
+
+! Fonction objectif (profit)
+MAX = @SUM(ARC(p,c): Revenu(p,c) * X(p,c));
+
+! Capacite totale de production
+@SUM(ARC(p,c): Capacite(p,c) * X(p,c)) <= 1;
+
+! Une seule quantite produite par client
+@FOR(CLIENTS(c): @SUM(PRODUCTION(p): X(p,c)) <= 1);
+
+! Variables binaires
+@FOR(ARC(p,c): @BIN(X(p,c)));
+
+END

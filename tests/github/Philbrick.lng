@@ -1,0 +1,30 @@
+
+MODEL:
+SETS:
+PRODUITS /@OLE('philbrick.xlsx')/:revenu,cout_stock;
+MOIS/@OLE('philbrick.xlsx')/:jours_prod;
+USINES/@OLE('philbrick.xlsx')/:;
+REGION   /@OLE('philbrick.xlsx')/:cap;
+PROCEDES   /@OLE('philbrick.xlsx')/:;
+
+ARC1(PRODUITS,REGION,MOIS):demande;
+ARC2(PRODUITS,USINES,REGION):cout_transport;
+ARC3(PRODUITS,USINES,PROCEDES):cout_prod,taux_prod;
+ARC4(PRODUITS,MOIS,USINES,REGION,PROCEDES):X;
+ARC5(PRODUITS,USINES):stock;
+ENDSETS
+
+MAX = @SUM(PRODUITS(p):revenu(p)*@SUM(MOIS(m):@SUM(USINES(u):@SUM(REGION(r):@SUM(PROCEDES(pr):X(p,m,u,r,pr))))))
+                -@SUM(ARC2(p,u,r):cout_transport(p,u,r)*@SUM(MOIS(m):@SUM(PROCEDES(pr):X(p,m,u,r,pr))))
+                -@SUM(PRODUITS(p):cout_stock(p)*@SUM(USINES(u):stock(p,u)))
+                -@SUM(ARC3(p,u,pr):cout_prod(p,u,pr)*@SUM(MOIS(m):@SUM(REGION(r):X(p,m,u,r,pr))));
+
+!CONTRAINTES;
+!sur la demande;
+@FOR(PRODUITS(p):@FOR(REGION(r):@SUM(USINES(u):@SUM(PROCEDES(pr):X(p,1,u,r,pr))-stock(p,u))<=demande(p,r,1)));
+@FOR(PRODUITS(p):@FOR(REGION(r):@SUM(USINES(u):@SUM(PROCEDES(pr):X(p,2,u,r,pr))+stock(p,u))<=demande(p,r,2)));
+@FOR(MOIS(m):@FOR(USINES(u):@SUM(PRODUITS(p):@SUM(PROCEDES(pr):1/taux_prod(p,u,pr)*@SUM(REGION(r):X(p,m,u,r,pr))))<=jours_prod(m)));
+@FOR(USINES(u):@SUM(PRODUITS(p):stock(p,u))<=cap);
+
+
+END

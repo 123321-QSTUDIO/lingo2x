@@ -1,0 +1,36 @@
+MODEL :
+SETS:
+employes/1,2,3,4,5/:;
+taches/1,2,3,4,5/:;
+ARC(employes,taches):c,x;
+ENDSETS
+
+DATA:
+c=39,65,69,66,57,
+64,84,24,92,22,
+49,50,61,31,45,
+48,45,55,23,50,
+59,34,30,34,18;
+ENDDATA
+
+MIN = @SUM(ARC(e,t):c(e,t)*x(e,t));
+@FOR(taches(t):@SUM(employes(e):x(e,t))=1);
+!@for(employes(e):@sum(taches(t):x(e,t))=1);
+!@FOR(ARC(e,t):x(e,t)<=1);
+
+@FOR(employes(e):@FOR(taches(t):x(e,t) <= 1));
+
+x(5,5)<=0;x(5,2)>=1;
+!x(5,2)<=0;!x(5,5)>=1;
+
+!x(4,4)<=0;!x(4,2)>=1;
+!x(4,2)<=0;!x(4,4)>=1;
+
+
+!x(2,5)<=0;!x(2,3)>=1;
+x(2,3)<=0;x(2,5)>=1;
+
+
+x(5,3)<=0;x(5,2)>=1;
+!x(5,2)<=0;!x(5,3)>=1;
+END

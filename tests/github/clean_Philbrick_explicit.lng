@@ -1,0 +1,41 @@
+
+MODEL:
+SETS:
+PRODUITS /P1,P2/:revenu,cout_stock;
+MOIS /fevrier,mars/:jours_prod;
+USINES /U1,U2/:;
+REGION /Est,Ouest/:cap;
+PROCEDES /PR1,PR2/:;
+
+ARC1(PRODUITS,REGION,MOIS):demande;
+ARC2(PRODUITS,USINES,REGION):cout_transport;
+ARC3(PRODUITS,USINES,PROCEDES):cout_prod,taux_prod;
+ARC4(PRODUITS,MOIS,USINES,REGION,PROCEDES):X;
+ARC5(PRODUITS,USINES):stock;
+ENDSETS
+
+DATA:
+revenu = 83,112;
+cout_stock = 3,4;
+jours_prod = 20,23;
+cap = 1000,1000;
+demande = 3600,6300,4900,4200,4500,5400,5100,6000;
+cout_transport = 0,9,9,0,0,7,7,0;
+cout_prod = 62,59,61,65,78,85,89,86;
+taux_prod = 100,140,130,110,120,150,160,130;
+ENDDATA
+
+MAX = @SUM(PRODUITS(p):revenu(p)*@SUM(MOIS(m):@SUM(USINES(u):@SUM(REGION(r):@SUM(PROCEDES(pr):X(p,m,u,r,pr))))))
+                -@SUM(ARC2(p,u,r):cout_transport(p,u,r)*@SUM(MOIS(m):@SUM(PROCEDES(pr):X(p,m,u,r,pr))))
+                -@SUM(PRODUITS(p):cout_stock(p)*@SUM(USINES(u):stock(p,u)))
+                -@SUM(ARC3(p,u,pr):cout_prod(p,u,pr)*@SUM(MOIS(m):@SUM(REGION(r):X(p,m,u,r,pr))));
+
+!CONTRAINTES;
+!sur la demande;
+@FOR(PRODUITS(p):@FOR(REGION(r):@SUM(USINES(u):@SUM(PROCEDES(pr):X(p,1,u,r,pr))-stock(p,u))<=demande(p,r,1)));
+@FOR(PRODUITS(p):@FOR(REGION(r):@SUM(USINES(u):@SUM(PROCEDES(pr):X(p,2,u,r,pr))+stock(p,u))<=demande(p,r,2)));
+@FOR(MOIS(m):@FOR(USINES(u):@SUM(PRODUITS(p):@SUM(PROCEDES(pr):1/taux_prod(p,u,pr)*@SUM(REGION(r):X(p,m,u,r,pr))))<=jours_prod(m)));
+@FOR(USINES(u):@SUM(PRODUITS(p):stock(p,u))<=cap);
+
+
+END

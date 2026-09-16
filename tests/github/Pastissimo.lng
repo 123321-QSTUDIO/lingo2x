@@ -1,0 +1,41 @@
+
+MODEL:
+
+SETS:
+PERIODES/1, 2, 3, 4, 5, 6/:Cout_achat, Cout_prod, mini, maxi, cap_prod, Achat_ble, Prod_spag, Stock_ble, Stock_spag;
+ENDSETS
+
+DATA:
+Cout_achat=1000,975,1000,980,1020,1025;
+mini=4,3,5,2,4,5;
+maxi=6,4,7,3,7,6;
+cap_prod=6,5,4,4,4,3;
+Cout_prod=160,150,150,160,175,165;
+cap_ble=3;
+cap_spag=1;
+cout_Stock_ble=20;
+cout_Stock_spag=25;
+
+ENDDATA
+
+
+MIN = @SUM(PERIODES(p): Cout_achat(p) * Achat_ble(p)+ Cout_prod(p)  * Prod_spag(p)+ cout_Stock_ble  * Stock_ble(p)+ cout_Stock_spag  * Stock_spag(p));
+
+
+@FOR(PERIODES(p): Achat_ble(p) >= mini(p));   
+@FOR(PERIODES(p): Achat_ble(p) <= maxi(p));   
+@FOR(PERIODES(p): Prod_spag(p) <= cap_prod(p));    
+@FOR(PERIODES(p): Stock_ble(p) <= cap_ble);     
+@FOR(PERIODES(p): Stock_spag(p) <= cap_spag);   
+
+@FOR(PERIODES(i) | i#GE#2:Stock_ble(i)=Stock_ble(i-1)+Achat_ble(i)-Prod_spag(i));
+Stock_ble(1)=2+Achat_ble(1)-Prod_spag(1);
+Stock_ble(6)=2;
+@FOR(PERIODES(i) | i#GE#2:Stock_spag(i)=Stock_spag(i-1)+Prod_spag(i)-4);
+Stock_spag(1)=Prod_spag(1)-4;
+Stock_spag(6)=0;
+
+
+
+END
+

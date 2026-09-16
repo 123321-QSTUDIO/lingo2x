@@ -1,0 +1,26 @@
+MODEL:
+
+SETS:
+ALIMENTS: Prix,Calories,X;
+INGREDIENTS: Dietejour;
+ARCS(ALIMENTS,INGREDIENTS):Qteing;
+ENDSETS
+
+DATA:
+ALIMENTS, INGREDIENTS, Prix, Calories, DIetejour, Qteing= @OLE('regime.xlsx');
+
+ENDDATA
+!Fonction objectif;
+[regimeeco] MIN = @SUM(ALIMENTS(a):Prix(a) * X(a));
+!Contrainte;
+@FOR(INGREDIENTS(i):[mangerdetout] @SUM(ALIMENTS(a):Qteing(a,i) * X(a))>=Dietejour(i)
+);
+
+@SUM(ALIMENTS: Calories(a) * X(a))>=500;
+
+DATA:
+@OLE('regime.xlsx')=X, regimeeco;
+
+ENDDATA
+
+END

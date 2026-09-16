@@ -1,0 +1,13 @@
+MODEL:
+! 0-1 背包：容量 10，选物品使总价值最大;
+SETS:
+    ITEMS /A, B, C, D, E/: VALUE, WEIGHT, X;
+ENDSETS
+DATA:
+    VALUE  = 6, 3, 5, 4, 6;
+    WEIGHT = 2, 2, 6, 5, 4;
+ENDDATA
+MAX = @SUM(ITEMS(I): VALUE(I) * X(I));
+@SUM(ITEMS(I): WEIGHT(I) * X(I)) <= 10;
+@FOR(ITEMS(I): @BIN(X(I)));
+END

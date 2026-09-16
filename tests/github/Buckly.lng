@@ -1,0 +1,23 @@
+MODEL :
+
+SETS:
+TEMPS_PLEIN/1, 2, 3/:Xplein;
+TEMPS_PARTIEL/1, 2, 3, 4/:Xpartiel, demande;
+ENDSETS
+
+DATA:
+salaire_plein=112;
+salaire_partiel=48;
+demande=4,8,10,6;
+ENDDATA
+
+MIN=@SUM(TEMPS_PLEIN(f):salaire_plein*Xplein(f))+@SUM(TEMPS_PARTIEL(h):salaire_partiel*Xpartiel(h));
+
+@FOR(TEMPS_PARTIEL(h):@SUM(TEMPS_PLEIN(f)|f#GE#h-1 #AND# f#LE#h:Xplein(f))+Xpartiel(h)>=demande(h));
+
+@FOR(TEMPS_PARTIEL(h):@SUM(TEMPS_PLEIN(f)|f#GE#h-1 #AND# f#LE#h:Xplein(f))>=2*Xpartiel(h));
+
+@FOR(TEMPS_PARTIEL(h):@GIN(Xpartiel(h)));
+@FOR(TEMPS_PLEIN(f):@GIN(Xplein(f)));
+
+END

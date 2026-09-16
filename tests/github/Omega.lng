@@ -1,0 +1,22 @@
+MODEL :
+
+SETS:
+PRODUITS: PROFIT,DEMANDE,X;
+MACHINES: CAP;
+PRODUCTION(MACHINES,PRODUITS): HRPROD;
+ENDSETS
+
+DATA:
+PRODUITS, MACHINES, PROFIT, DEMANDE, CAP, HRPROD = @OLE('Omega.xlsx');
+
+ENDDATA
+
+!FONCTION OBJECTIF;
+MAX = @SUM(PRODUITS:PROFIT * X);
+
+!CONTRAINTES;
+@FOR(PRODUITS: X <= DEMANDE);!pas plus de production que la demande;
+@FOR(MACHINES(m): @SUM(PRODUITS(p): HRPROD(m,p)*X(p))<=CAP(m));!pas plus de production que la capacite des machines;
+@FOR(PRODUITS:@GIN(X));!Produits entiers!;
+
+END

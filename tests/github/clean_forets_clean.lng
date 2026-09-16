@@ -1,0 +1,28 @@
+
+
+MODEL:
+SETS:
+MATIERES /Epinette, Sapin/:DISPO;
+PRODUITS/Planche, Contreplaque/:Gain, Engagement, X;!X le nombre de milliers de planche et contreplaqu� a PRODUIRE;
+ARC(MATIERES,PRODUITS):UTILISATION;
+ENDSETS
+
+!Parametres;
+DATA:
+UTILISATION=1000,2000,
+		1200,4000;
+Gain=200,300;
+Engagement=40,30;
+DISPO=150000,200000;
+ENDDATA
+
+! Fonction objectif;
+ MAX = @SUM(PRODUITS(p):Gain(p) * X(p));
+
+!CONTRAINTES;
+!sur l Engagement;
+@FOR(PRODUITS(p):X(p)>=Engagement(p));
+! sur la disponibilite;
+@FOR(MATIERES(m):@SUM(PRODUITS(p):UTILISATION(m,p)*X(p))<=DISPO(m));
+
+END

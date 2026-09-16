@@ -1,0 +1,28 @@
+MODEL:
+
+SETS:
+TACHES/marche,cuisine,vaisselle,buanderie/:;
+PERSONNES/Eve,Steven/:;
+ARC(PERSONNES,TACHES):temps,x;
+ENDSETS
+
+DATA:
+temps=4.5,7.8,3.6,2.9,
+      4.9,7.2,4.3,3.1;
+ENDDATA
+
+!FO+temps total passe aux taches;
+!MIN=@SUM(ARC:temps*x);
+
+MIN=@SUM(PERSONNES(p):@SUM(TACHES(t):temps(p,t)*x(p,t)));
+
+!SAC;
+!deux taches chacun;
+@FOR(PERSONNES(p):@SUM(TACHES(t):x(p,t))=2);
+
+!Toutes les taches sont faites une seule fois;
+@FOR(TACHES(t):@SUM(PERSONNES(p):x(p,t))=1);
+
+!variables binaires;
+@FOR(ARC:@BIN(x));
+END
