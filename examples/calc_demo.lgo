@@ -1,0 +1,21 @@
+MODEL:
+! CALC 段演示：求解前先算出派生参数 B;
+SETS:
+    N /1..3/: A, B, X;
+ENDSETS
+DATA:
+    A = 1, 2, 3;
+ENDDATA
+
+procedure doubleit:
+    @FOR(N(i): B(i) = A(i) * 2);
+endprocedure
+
+CALC:
+    doubleit;                        ! 调过程：B = A*2 = 2,4,6;
+    @FOR(N(i): B(i) = B(i) + 1);     ! 再自增：B = 3,5,7;
+ENDCALC
+
+MAX = @SUM(N(i): B(i) * X(i));
+@SUM(N(i): X(i)) <= 2;
+END

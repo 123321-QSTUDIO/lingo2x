@@ -17,12 +17,16 @@ description: >-
 
 ## 命令
 
-- **直接求解**（首选，零依赖安装）：`.venv/Scripts/python -m lingo2x 模型.lng -b scipy`
-  打印最优值和非零变量。Linux/macOS 上把 `.venv/Scripts/python` 换成 `.venv/bin/python`。
-- **语法检查**（只查错不求解，输出 `文件:行:列: 错误`）：`python -m lingo2x 模型.lng --check`
+统一使用项目 `.venv` 里的 Python（`@OLE` 依赖其中的 openpyxl）：
+
+- **直接求解**（首选）：`.venv/Scripts/python -m lingo2x 模型.lng -b scipy`
+  打印最优值和非零变量；若模型含 `@OLE(...) = X` 写回语句，求解后自动写回 Excel。
+  Linux/macOS 上把 `.venv/Scripts/python` 换成 `.venv/bin/python`。
+- **语法检查**（只查错不求解，不加载 Excel，输出 `文件:行:列: 错误`）：
+  `.venv/Scripts/python -m lingo2x 模型.lng --check`
 - **翻译成 GMPL 用 glpsol 求解**：
-  `python -m lingo2x 模型.lng -b gmpl -o 模型.mod`，然后 `tools/glpk-4.65/w64/glpsol.exe -m 模型.mod`
-- **生成通用 LP 文件**（CBC / HiGHS / SCIP 均可读）：`python -m lingo2x 模型.lng -b lp`
+  `.venv/Scripts/python -m lingo2x 模型.lng -b gmpl -o 模型.mod`，然后 `tools/glpk-4.65/w64/glpsol.exe -m 模型.mod`
+- **生成通用 LP 文件**（CBC / HiGHS / SCIP 均可读）：`.venv/Scripts/python -m lingo2x 模型.lng -b lp`
 
 ## 支持的语法
 
@@ -33,11 +37,19 @@ DATA 中定义成员）、`DATA:/ENDDATA`（多名字交错赋值）、`[name] M
 `@BIN/@GIN/@FREE`、命名约束 `[name]`、下标算术（如 `X(i-1)`）、字面成员下标（如 `x(5,5)`）、
 名字大小写不敏感、注释 `! ... ;`（本行无分号则到行尾）。
 
+外部数据与计算段：
+
+- `@OLE('文件.xlsx'[, '区域'])` 读取 Excel 命名区域/单元格区域（行主序），可给集合成员和参数赋值
+- `@OLE('文件.xlsx', '区域') = X;` 求解后把结果写回 Excel（仅 scipy 求解路径生效）
+- `CALC: ... ENDCALC` 与 `procedure 名: ... endprocedure`：求解前的参数计算，
+  支持赋值、`@FOR` 循环赋值、过程调用；`@TEXT/@TABLE/@WRITE` 解析后忽略。
+  CALC 中只允许参数参与运算（引用决策变量会报错）
+
 ## 不支持（会明确报错，按报错提示改写即可）
 
-- `@OLE` / `@POINTER` / `@FILE` 等外部数据源 → 把数据内联进 `DATA` 段再运行
+- `@POINTER` / `@FILE` 等其他外部数据源
 - 非线性表达式（变量×变量等）→ 本工具只支持线性模型
-- `CALC:` 段、`procedure`、派生集的 `|` 成员过滤
+- 派生集的 `|` 成员过滤（如 `LOCATION(P,P) | &1 #LE# &2`）
 
 ## 验证
 

@@ -52,6 +52,8 @@ def main(argv=None):
         return _check(args.model)
 
     m = parse_file(args.model)
+    from .resolve import resolve_external
+    resolve_external(m, os.path.dirname(os.path.abspath(args.model)))
     be = BACKENDS[args.backend]
 
     if hasattr(be, 'solve'):                       # 直解后端
@@ -64,6 +66,9 @@ def main(argv=None):
                     print(f"  {k} = {v:g}")
         return 0 if r['success'] else 1
 
+    if m.ole_writes:
+        print('注意：@OLE 结果写回只在 scipy 求解时生效，文本后端已忽略',
+              file=sys.stderr)
     text = be.emit(m)                              # 文本后端
     out = args.output
     if out is None:

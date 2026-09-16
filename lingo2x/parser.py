@@ -15,7 +15,7 @@ import re
 
 from .lexer import tokenize
 from .model import (Model, SetDef, Constraint, Num, Ref, Bin, Neg, Sum,
-                    IVar, QCmp, QAnd, QOr, QNot)
+                    IVar, QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall)
 
 
 class ParseError(Exception):
@@ -104,10 +104,15 @@ class Parser:
         while not self.at_kw('END'):
             if self.peek()[0] == 'EOF':
                 break
-            if self.at_kw('CALC'):
-                self.err("暂不支持 CALC 段")
-            if self.at_kw('PROCEDURE'):
-                self.err("暂不支持 procedure 过程")
+            if self.accept_kw('CALC'):
+                self.expect_op(':')
+                self.m.calc_main.extend(self._calc_block('ENDCALC'))
+                continue
+            if self.accept_kw('PROCEDURE'):
+                pname = self._name('过程名')
+                self.expect_op(':')
+                self.m.calc_procs[pname] = self._calc_block('ENDPROCEDURE')
+                continue
             if self.accept_kw('SETS'):
                 self.expect_op(':')
                 self.parse_sets()
@@ -183,17 +188,46 @@ class Parser:
         self.err(f"无法展开的区间成员 {a}..{b}")
 
     # ---- DATA 段 ----
+    def _parse_ole_call(self):
+        """@OLE('文件' [, '区域']) → (文件名, 区域或None)"""
+        self.next()                            # @OLE
+        self.expect_op('(')
+        t = self.next()
+        if t[0] != 'STR':
+            raise ParseError(f"@OLE 的第一个参数应为文件名字符串，得到 {t[1]!r}（位置 {t[2]}）")
+        fname = t[1]
+        rng = None
+        if self.accept_op(','):
+            t = self.next()
+            if t[0] != 'STR':
+                raise ParseError(f"@OLE 的区域参数应为字符串，得到 {t[1]!r}（位置 {t[2]}）")
+            rng = t[1]
+        self.expect_op(')')
+        return fname, rng
+
     def parse_data(self):
         while not self.accept_kw('ENDDATA'):
             t = self.peek()
             if t[0] == 'AT':
-                self.err(f"暂不支持外部数据/输出函数 {t[1].upper()}；"
-                         "请先把数据内联到 DATA 段")
+                f = t[1].upper()
+                if f == '@OLE':                # @OLE('f','r') = X, Y; → 求解后写回 Excel
+                    fname, rng = self._parse_ole_call()
+                    self.expect_op('=')
+                    names = [self._canon.setdefault(a.upper(), a) for a in self._id_list()]
+                    self.expect_op(';')
+                    self.m.ole_writes.append((fname, rng, names))
+                    continue
+                self.err(f"暂不支持外部数据/输出函数 {f}；DATA 段只支持 @OLE")
             names = [self._canon.setdefault(a.upper(), a) for a in self._id_list()]
             self.expect_op('=')
             if self.peek()[0] == 'AT':
-                self.err(f"暂不支持外部数据/输出函数 {self.peek()[1].upper()}；"
-                         "请先把数据内联到 DATA 段")
+                f = self.peek()[1].upper()
+                if f == '@OLE':                # 名 = @OLE('f'[,'r']); → 从 Excel 读
+                    fname, rng = self._parse_ole_call()
+                    self.expect_op(';')
+                    self.m.ole_reads.append((names, fname, rng))
+                    continue
+                self.err(f"暂不支持外部数据函数 {f}；DATA 段只支持 @OLE")
             vals = []
             while not self.at_op(';'):
                 if self.accept_op(','):
@@ -284,6 +318,67 @@ class Parser:
             if v in ('<=', '>=', '=', '<', '>'):
                 return {'<': '<=', '>': '>='}.get(v, v)   # LINGO 中 < > 即 <= >=
         raise ParseError(f"期望比较运算符（<=、>=、=），得到 {t[1]!r}（位置 {t[2]}）")
+
+    # ---- CALC 段 / procedure ----
+    def _calc_block(self, end_kw):
+        stmts = []
+        while not self.accept_kw(end_kw):
+            if self.peek()[0] == 'EOF':
+                self.err(f"缺少 {end_kw}")
+            st = self._calc_stmt()
+            if st is not None:
+                stmts.append(st)
+        return stmts
+
+    def _calc_stmt(self, in_for=False):
+        t = self.peek()
+        if t[0] == 'AT':
+            f = t[1].upper()
+            if f == '@FOR':
+                return self._calc_for()
+            if f in ('@TEXT', '@TABLE', '@WRITE'):   # 显示类函数：解析并忽略
+                self.next()
+                if self.accept_op('('):
+                    depth = 1
+                    while depth and self.peek()[0] != 'EOF':
+                        if self.accept_op('('):
+                            depth += 1
+                        elif self.accept_op(')'):
+                            depth -= 1
+                        else:
+                            self.next()
+                if self.accept_op('='):
+                    self.next()                # 忽略右侧（一般是输出字符串）
+                self.expect_op(';')
+                return None
+            self.err(f"CALC 段中暂不支持函数 {f}")
+        name = self._name('名字')
+        if self.accept_op(';'):                # 裸名字：调用 procedure
+            return CalcCall(name)
+        idx = ()
+        if self.accept_op('('):
+            idx = [self._idx_expr()]
+            while self.accept_op(','):
+                idx.append(self._idx_expr())
+            self.expect_op(')')
+        self.expect_op('=')
+        e = self.expr()
+        if not in_for:                         # @FOR 体内的赋值不带分号
+            self.expect_op(';')
+        return CalcAssign(name, tuple(idx), e)
+
+    def _calc_for(self):
+        self.next()                            # @FOR
+        domain, qual = self._for_head()
+        self.expect_op(':')
+        self._ctx.append(domain)
+        try:
+            body = self._calc_stmt(in_for=True)
+        finally:
+            self._ctx.pop()
+        self.expect_op(')')
+        self.expect_op(';')
+        return CalcFor(domain, qual, [body] if body is not None else [])
 
     # ---- @FOR ----
     def parse_for(self):

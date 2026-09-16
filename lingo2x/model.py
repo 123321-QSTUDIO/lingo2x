@@ -100,6 +100,29 @@ class Constraint:
     qual: Expr = None                # @FOR 的 | 条件过滤，可选
 
 
+# ---------- CALC 段语句 ----------
+
+@dataclass
+class CalcAssign:
+    """CALC/procedure 里的赋值：name(indices) = expr（只允许参数参与运算）。"""
+    name: str
+    indices: tuple = ()
+    expr: Expr = None
+
+
+@dataclass
+class CalcFor:
+    domain: tuple = ()
+    qual: Expr = None
+    body: list = field(default_factory=list)   # CalcAssign / CalcFor / CalcCall
+
+
+@dataclass
+class CalcCall:
+    """调用 procedure 定义的过程。"""
+    name: str = ""
+
+
 @dataclass
 class Model:
     sets: dict = field(default_factory=dict)       # 名 -> SetDef（保持声明顺序）
@@ -109,6 +132,13 @@ class Model:
     constraints: list = field(default_factory=list)
     varkind: dict = field(default_factory=dict)    # 变量族名 -> 'bin'|'gin'|'free'
     source: str = ""                               # 源文件名，用于输出注释
+    # @OLE 外部数据：读 = ([名字...], 文件, 区域或None)；写 = (文件, 区域或None, [名字...])
+    ole_reads: list = field(default_factory=list)
+    ole_writes: list = field(default_factory=list)
+    # CALC 段：procedure 定义表 + 主 CALC 语句序列
+    calc_procs: dict = field(default_factory=dict)
+    calc_main: list = field(default_factory=list)
+    calc_assigned: set = field(default_factory=set)  # CALC 中被赋值的名字（执行时填写）
 
     def set_domain(self, setname):
         """集合的维度序列：基本集 → 自身；派生集 → 父集序列。"""

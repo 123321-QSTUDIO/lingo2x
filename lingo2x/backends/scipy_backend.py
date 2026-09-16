@@ -67,6 +67,11 @@ def solve(model):
     obj = None
     if res.fun is not None:
         obj = -res.fun if f.sense == 'max' else res.fun
+    if res.success and model.ole_writes:
+        from ..resolve import write_ole_back
+        import os
+        write_ole_back(model, f, res.x,
+                       os.path.dirname(os.path.abspath(model.source)) if model.source else '.')
     return {
         'success': bool(res.success),
         'message': str(res.message),
