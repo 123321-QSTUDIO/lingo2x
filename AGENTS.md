@@ -16,6 +16,6 @@
 - `lingo2x/` — LINGO → 中间模型 → 后端（gmpl / lp / scipy）翻译器，零依赖纯 Python
 - `.venv/` — scipy 后端用的隔离环境（numpy + scipy）
 - `tools/glpk-4.65/` — GLPK 便携版（glpsol 在 `w64/` 下）
-- `examples/` — 三个自建示例模型；`tests/github/` — GitHub 真实模型回归语料
+- `examples/` — 自建示例模型（含 CALC 演示）；`tests/github/` — GitHub 真实模型回归语料（含 @OLE 测试用 xlsx）
 - `tests/compare_backends.py` — 双后端一致性回归测试
 - `editors/vscode/` — VS Code / Antigravity 编辑器插件源码
