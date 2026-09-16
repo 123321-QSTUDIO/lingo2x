@@ -21,8 +21,10 @@ LINGO 源码 (.lng/.lgo) → 解析器 → 中间模型 (IR) → 可插拔求解
 - **@OLE 读写 Excel**：`COST = @OLE('data.xlsx')` 读数据；`@OLE('out.xlsx','X') = X;` 求解后写回
 - **CALC 段**：`CALC:`/`procedure` 求解前的参数计算
 - **三个后端**：scipy（HiGHS）直解 / 生成 GMPL 给 glpsol / 生成通用 LP 文件
-- **编辑器插件**（VS Code / Antigravity）：语法高亮、代码片段、保存时语法检查（波浪线）、一键求解
-- **Agent skill**：Antigravity IDE/CLI 的 agent 看到 .lng 会直接用它求解，不会叫你"拿去 LINGO 里跑"
+- **编辑器插件**：语法高亮、代码片段、保存时语法检查（波浪线）、一键求解。
+  VS Code 及所有 VS Code 系 AI IDE（Antigravity / Cursor / Windsurf / Trae …）通用
+- **Agent skill**：标准 SKILL.md 格式，Antigravity IDE/CLI、Claude Code、Kimi Code 等
+  各类 agent 装上后，看到 .lng 会直接用它求解，不会叫你"拿去 LINGO 里跑"
 
 ## 快速开始
 
@@ -90,16 +92,46 @@ END
 | `CALC:` / `procedure` 参数计算 | `@PPOISCDF` 等概率分布函数 |
 | 隐式下标、下标算术 `X(i-1)` | `@BND`（暂以变量默认界代替） |
 
-## 编辑器插件
+## 编辑器插件（VS Code 系 IDE 通用）
 
-`editors/vscode/` 是一个 VS Code 系插件（VS Code / Antigravity 通用）：
+`editors/vscode/` 是一个标准 VS Code 插件，**VS Code 及所有基于它的 AI IDE 都能装**
+（Antigravity、Cursor、Windsurf、Trae …）：
 
 - `.lng`/`.lgo` 语法高亮、片段（`model` / `transport` / `sumif` ...）
 - 保存时语法检查，错误精确到行列
 - 标题栏一键求解（scipy/HiGHS 或 GLPK/glpsol）
 
-安装：打包成 vsix 后 `code --install-extension lingo2x-0.1.0.vsix`
-（Antigravity 用 `antigravity-ide --install-extension ...`）。
+安装：打包成 vsix（本质是 zip，结构见仓库 `editors/vscode/`）后用各 IDE 的 CLI 安装：
+
+```bash
+code --install-extension lingo2x-0.1.0.vsix              # VS Code
+antigravity-ide --install-extension lingo2x-0.1.0.vsix   # Antigravity
+cursor --install-extension lingo2x-0.1.0.vsix            # Cursor
+windsurf --install-extension lingo2x-0.1.0.vsix          # Windsurf
+trae --install-extension lingo2x-0.1.0.vsix              # Trae
+```
+
+也可以把 `editors/vscode/` 整个目录复制到对应 IDE 的扩展目录后重载窗口
+（VS Code 是 `~/.vscode/extensions/lingo2x-0.1.0`，各 IDE 换成自己的目录）。
+
+## Agent skill（给 IDE / CLI 里的 AI agent 用）
+
+`.agents/skills/lingo2x/SKILL.md` 是标准 SKILL.md 技能文件：告诉 agent 本项目可以
+直接求解 LINGO 模型、用哪几条命令、支持到什么语法。装上之后，agent 看到 `.lng`
+会直接求解，而不是让你"拿去 LINGO 里跑"。
+
+把 `lingo2x` 这个 skill 目录复制到各 agent 的技能目录即可（本项目根目录已自带
+项目级的 `.agents/skills/` 和 `.claude/skills/`）：
+
+| Agent | 用户级（全局生效） | 项目级 |
+| --- | --- | --- |
+| Antigravity IDE | `~/.gemini/antigravity/skills/` | `.agents/skills/`（已自带） |
+| Antigravity CLI（agy） | `~/.gemini/antigravity-cli/skills/` | `.agents/skills/`（已自带） |
+| Claude Code | `~/.claude/skills/` | `.claude/skills/`（已自带） |
+| Kimi Code | `~/.agents/skills/` | `.agents/skills/`（已自带） |
+
+规则文件同理：`AGENTS.md` 被多数 agent 读取；**Claude Code 读的名字是 `CLAUDE.md`**
+（项目根目录已备好，内容与 AGENTS.md 等价）。
 
 ## 测试
 
@@ -121,7 +153,8 @@ lingo2x/            翻译器核心（lexer / parser / IR / 实例化器 / 后�
 examples/           示例模型（运输、背包、生产计划、CALC 演示）
 tests/github/       真实模型回归语料（含 @OLE 测试用 xlsx）
 editors/vscode/     编辑器插件源码
-.agents/skills/     agent skill（教 IDE agent 直接用本工具链）
+.agents/skills/     agent skill（SKILL.md 标准格式；.claude/skills/ 是同内容副本）
+AGENTS.md           agent 规则文件（CLAUDE.md 是给 Claude Code 的等价副本）
 ```
 
 ## 加一个新求解器后端
