@@ -2,13 +2,61 @@
 
 流程位置：parse → resolve_external（本模块）→ analyze/后端。
 @OLE 读取需要 openpyxl（只装在 .venv 里，未安装时给出明确报错）。
+
+安全约定：
+- @OLE 的文件路径被禁锢在模型文件所在目录内（realpath 校验），
+  拒绝 UNC 路径（防 NTLM 中继）与 '..' 逃逸；
+- 打开 xlsx 前做 zip 炸弹预检（未压缩总大小 / 压缩比阈值）；
+- 写回 Excel 前会把解析后的绝对路径打印出来。
 """
 import os
+import sys
+import zipfile
 from itertools import product
 
 from .model import (ModelError, Num, Ref, Bin, Neg, Sum, IVar,
-                    QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall)
+                    QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall,
+                    validate_member, MAX_SET_MEMBERS)
 from .instantiate import _normkey, _tonum
+
+# zip 炸弹预检阈值
+_OLE_MAX_UNCOMPRESSED = 200 * 1024 * 1024   # 未压缩总大小上限 200MB
+_OLE_MAX_RATIO = 100.0                       # 单条目压缩比上限
+
+
+def _safe_ole_path(base_dir, fname):
+    """把 @OLE 的文件名解析成绝对路径，并禁锢在 base_dir 内。"""
+    if fname.startswith(('\\\\', '//')):
+        raise ModelError(f"@OLE 拒绝 UNC 路径（防凭据中继）：{fname!r}")
+    base = os.path.realpath(base_dir)
+    p = fname if os.path.isabs(fname) else os.path.join(base, fname)
+    real = os.path.realpath(p)
+    if os.path.commonpath([base, real]) != base:
+        raise ModelError(
+            f"@OLE 路径越界：{fname!r} 解析为 {real}，不在模型目录 {base} 内。"
+            "把数据文件放到模型同目录下再试")
+    return real
+
+
+def _check_zip_bomb(path):
+    """打开 xlsx 前的预检：xlsx 是 zip，拒绝解压炸弹。"""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            total = 0
+            for info in zf.infolist():
+                total += info.file_size
+                if info.compress_size > 0 and \
+                        info.file_size / info.compress_size > _OLE_MAX_RATIO:
+                    raise ModelError(
+                        f"@OLE 拒绝可疑的压缩包（疑似 zip 炸弹）："
+                        f"{os.path.basename(path)} 条目 {info.filename!r} "
+                        f"压缩比 {info.file_size / info.compress_size:.0f}:1")
+                if total > _OLE_MAX_UNCOMPRESSED:
+                    raise ModelError(
+                        f"@OLE 文件解压后过大（>{_OLE_MAX_UNCOMPRESSED // 1024 // 1024}MB），"
+                        f"拒绝加载：{os.path.basename(path)}")
+    except zipfile.BadZipFile as e:
+        raise ModelError(f"@OLE 文件不是有效的 xlsx（zip）：{os.path.basename(path)}（{e}）")
 
 
 def resolve_external(model, base_dir):
@@ -54,7 +102,10 @@ def _range_cells(wb, ref, fname):
         raise ModelError(f"@OLE 引用 {ref!r} 不存在：{fname} 中没有这个命名区域/工作表")
     if ':' not in cr:                                # 单单元格区域
         cr = f"{cr}:{cr}"
-    min_col, min_row, max_col, max_row = range_boundaries(cr)
+    try:
+        min_col, min_row, max_col, max_row = range_boundaries(cr)
+    except ValueError as e:
+        raise ModelError(f"@OLE 区域引用 {ref!r} 无效：{e}")
     return wb[sheet], (min_col, min_row, max_col, max_row)
 
 
@@ -65,11 +116,15 @@ def _resolve_ole_reads(model, base_dir):
     cache = {}
 
     def wb_for(fname):
-        p = fname if os.path.isabs(fname) else os.path.join(base_dir, fname)
+        p = _safe_ole_path(base_dir, fname)
         if not os.path.exists(p):
             raise ModelError(f"@OLE 找不到文件：{p}")
         if p not in cache:
-            cache[p] = openpyxl.load_workbook(p, data_only=True)
+            _check_zip_bomb(p)
+            try:
+                cache[p] = openpyxl.load_workbook(p, data_only=True)
+            except (OSError, ValueError) as e:
+                raise ModelError(f"@OLE 无法读取 {os.path.basename(p)}：{e}")
         return cache[p]
 
     for names, fname, rng in model.ole_reads:
@@ -90,7 +145,11 @@ def _assign_external(model, name, vals, fname):
         sd = model.sets[name]
         if sd.parents:
             raise ModelError(f"派生集 {name} 不能用 @OLE 定义成员")
-        mems = [_member_str(v) for v in vals]
+        if len(vals) > MAX_SET_MEMBERS:
+            raise ModelError(f"集合 {name} 从 {fname} 读入的成员数超过上限 "
+                             f"{MAX_SET_MEMBERS}（防内存耗尽）")
+        mems = [validate_member(_member_str(v), where=f'（{fname} → 集合 {name}）')
+                for v in vals]
         if sd.members and sd.members != mems:
             raise ModelError(f"集合 {name} 的成员在 SETS 与 @OLE 中不一致")
         sd.members = mems
@@ -102,7 +161,12 @@ def _assign_external(model, name, vals, fname):
                 v = float(v)
             except ValueError:
                 raise ModelError(f"参数 {name} 从 {fname} 读到了非数字 {v!r}")
-        nums.append(float(v))
+        try:
+            nums.append(float(v))
+        except (TypeError, ValueError):
+            raise ModelError(
+                f"参数 {name} 从 {fname} 读到了无法转成数字的单元格值 {v!r}"
+                f"（类型 {type(v).__name__}）")
     model.data[name] = nums
 
 
@@ -114,11 +178,15 @@ def write_ole_back(model, flat, xvector, base_dir):
     pos = {k: i for i, k in enumerate(flat.keys)}
     books = {}
     for fname, rng, names in model.ole_writes:
-        p = fname if os.path.isabs(fname) else os.path.join(base_dir, fname)
+        p = _safe_ole_path(base_dir, fname)
         if not os.path.exists(p):
             raise ModelError(f"@OLE 写回找不到文件：{p}")
+        print(f"@OLE 写回结果到: {p}", file=sys.stderr)
         if p not in books:
-            books[p] = openpyxl.load_workbook(p)
+            try:
+                books[p] = openpyxl.load_workbook(p)
+            except (OSError, ValueError) as e:
+                raise ModelError(f"@OLE 无法打开写回文件 {os.path.basename(p)}：{e}")
         wb = books[p]
         for name in names:
             dom = _domain_of(model, name)
@@ -137,7 +205,10 @@ def write_ole_back(model, flat, xvector, base_dir):
                 for c in range(c0, c1 + 1):
                     ws.cell(row=r, column=c).value = next(it)
     for p, wb in books.items():
-        wb.save(p)
+        try:
+            wb.save(p)
+        except OSError as e:
+            raise ModelError(f"@OLE 写回保存失败 {os.path.basename(p)}：{e}")
 
 
 # ================= CALC 段解释执行 =================
@@ -170,7 +241,15 @@ def _eval_idx(e, env):
     if isinstance(e, Bin):
         a = _tonum(_eval_idx(e.l, env))
         b = _tonum(_eval_idx(e.r, env))
-        return {'+': a + b, '-': a - b, '*': a * b, '/': a / b}[e.op]
+        if e.op == '+':
+            return a + b
+        if e.op == '-':
+            return a - b
+        if e.op == '*':
+            return a * b
+        if b == 0:
+            raise ModelError("CALC 下标表达式除以 0")
+        return a / b
     raise ModelError(f"CALC 下标表达式中出现非法节点 {type(e).__name__}")
 
 
@@ -227,7 +306,7 @@ def _eval_const(model, e, env, values):
     raise ModelError(f"CALC 中出现不支持的表达式节点 {type(e).__name__}")
 
 
-def _exec_block(model, stmts, env, values):
+def _exec_block(model, stmts, env, values, active=()):
     for st in stmts:
         if isinstance(st, CalcAssign):
             inst = tuple(_normkey(_eval_idx(x, env)) for x in st.indices)
@@ -237,14 +316,16 @@ def _exec_block(model, stmts, env, values):
             proc = model.calc_procs.get(st.name)
             if proc is None:
                 raise ModelError(f"CALC 调用了未定义的过程 {st.name}")
-            _exec_block(model, proc, dict(env), values)
+            if st.name in active:
+                raise ModelError(f"CALC 过程 {st.name} 循环调用（{' → '.join(active)}）")
+            _exec_block(model, proc, dict(env), values, active + (st.name,))
         elif isinstance(st, CalcFor):
             idx = [d[0] for d in st.domain]
             pools = [model.sets[s].members for _, s in st.domain]
             for combo in product(*pools):
                 env2 = {**env, **dict(zip(idx, combo))}
                 if st.qual is None or _eval_qual(st.qual, env2):
-                    _exec_block(model, st.body, env2, values)
+                    _exec_block(model, st.body, env2, values, active)
 
 
 def _run_calc(model):

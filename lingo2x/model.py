@@ -4,11 +4,38 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 
 class ModelError(Exception):
     pass
+
+
+# 集合成员名的安全字符集：成员名会进入 GMPL/LP 文件标签与错误消息，
+# 空白、引号、分号、控制字符等会破坏甚至注入生成的求解器文件
+_MEMBER_RE = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.\-]*$')
+
+# 规模上限（防内存耗尽型输入）
+MAX_SET_MEMBERS = 100_000        # 单个集合的成员数上限
+MAX_INSTANCES = 1_000_000        # 展开后的变量实例 / 约束行数上限
+
+
+def validate_member(m, where=''):
+    """集合成员名入口校验：拒绝会破坏标签单射性或注入求解器文件的名字。"""
+    if not isinstance(m, str) or not m or not _MEMBER_RE.match(m):
+        raise ModelError(
+            f"非法的集合成员名 {m!r}{where}：只允许字母数字开头，由字母、数字、_ . - 组成")
+    return m
+
+
+def _canon_member(m):
+    """成员名归一化（用于别名检测）：数字形字符串统一成数值规范形。"""
+    try:
+        f = float(m)
+    except (TypeError, ValueError):
+        return ('str', m)
+    return ('num', str(int(f)) if f.is_integer() else str(f))
 
 
 # ---------- 表达式 AST ----------
@@ -178,6 +205,15 @@ def analyze(m: Model) -> Symbols:
     sy = Symbols()
     attr_of = {}   # 属性名 -> 所在集合名
     for sd in m.sets.values():
+        # 成员别名检测：归一化后相同（如 '1' 与 '1.0'）的成员会产生静默别名
+        seen = {}
+        for mb in sd.members:
+            c = _canon_member(mb)
+            if c in seen:
+                raise ModelError(
+                    f"集合 {sd.name} 的成员 {mb!r} 与 {seen[c]!r} 归一化后相同，"
+                    "会产生别名，请改名区分")
+            seen[c] = mb
         dom = m.set_domain(sd.name)
         for a in sd.attrs:
             if a in attr_of:

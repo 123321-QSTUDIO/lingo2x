@@ -1,5 +1,13 @@
 // lingo2x VS Code 插件：语法检查（波浪线）+ 一键求解/翻译。
 // 依赖：工作区根目录下可 import 的 lingo2x 包（通过 PYTHONPATH 注入项目根）。
+//
+// 安全约定：
+// - 本插件会 spawn 外部进程（python / glpsol），且可执行文件路径可被
+//   工作区级设置（.vscode/settings.json 中的 lingo2x.pythonPath/glpsolPath）控制。
+//   因此工作区未受信任（Workspace Trust = false）时，一切执行类功能
+//   （保存时检查、求解、翻译）全部拒绝执行，仅保留语法高亮等纯声明式功能。
+// - 执行路径类设置在未信任时只取用户/全局值，忽略工作区级值。
+// - 子进程输出写进输出面板前统一剥离控制字符与终端转义序列。
 const vscode = require('vscode');
 const cp = require('child_process');
 const fs = require('fs');
@@ -12,8 +20,37 @@ function isLingo(doc) {
   return doc && doc.languageId === 'lingo' && doc.uri.scheme === 'file';
 }
 
+function canExecute() {
+  return vscode.workspace.isTrusted !== false;
+}
+
+function refuseExecution(what) {
+  vscode.window.showWarningMessage(
+    `lingo2x：当前工作区未受信任，已阻止${what}。`
+    + '请先信任该工作区（并确认其中没有 .vscode/settings.json 注入的可疑路径）再试。');
+}
+
 function cfg(key, fallback) {
   return vscode.workspace.getConfiguration('lingo2x').get(key, fallback);
+}
+
+function execPathCfg(key) {
+  const insp = vscode.workspace.getConfiguration('lingo2x').inspect(key);
+  if (!insp) return '';
+  if (canExecute()) {
+    return insp.workspaceFolderValue ?? insp.workspaceValue
+      ?? insp.globalValue ?? insp.defaultValue ?? '';
+  }
+  return insp.globalValue ?? insp.defaultValue ?? '';
+}
+
+// 剥离 C0/C1 控制字符（保留 \n \t）与 CSI/OSC 转义序列，防终端转义注入和输出伪造
+function clean(s) {
+  // 先删完整的 OSC/CSI 转义序列，再剥剩余控制字符（顺序不能反，
+  // 否则 ESC 被先删掉会留下序列残片）
+  return s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+          .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
+          .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u0080-\u009f]/g, '');
 }
 
 function findProjectRoot(filePath) {
@@ -38,7 +75,7 @@ function projectRoot(doc) {
 }
 
 function pythonPath(root) {
-  const fromCfg = cfg('pythonPath', '');
+  const fromCfg = execPathCfg('pythonPath');
   if (fromCfg) return fromCfg;
   const venv = path.join(root, '.venv', 'Scripts', 'python.exe');
   if (fs.existsSync(venv)) return venv;
@@ -46,7 +83,7 @@ function pythonPath(root) {
 }
 
 function glpsolPath(root) {
-  const fromCfg = cfg('glpsolPath', '');
+  const fromCfg = execPathCfg('glpsolPath');
   if (fromCfg) return fromCfg;
   const local = path.join(root, 'tools', 'glpk-4.65', 'w64', 'glpsol.exe');
   if (fs.existsSync(local)) return local;
@@ -68,8 +105,8 @@ function run(cmd, args, cwd, encoding) {
       cwd,
       env: { ...process.env, PYTHONPATH: root4import(cwd), PYTHONIOENCODING: 'utf-8' },
     });
-    p.stdout.on('data', d => output.append(dec.decode(d, { stream: true })));
-    p.stderr.on('data', d => output.append(dec.decode(d, { stream: true })));
+    p.stdout.on('data', d => output.append(clean(dec.decode(d, { stream: true }))));
+    p.stderr.on('data', d => output.append(clean(dec.decode(d, { stream: true }))));
     p.on('error', e => {
       output.appendLine(`启动失败: ${e.message}`);
       resolve(-1);
@@ -86,7 +123,7 @@ function run(cmd, args, cwd, encoding) {
 function printGlpsolSolution(solFile) {
   let text;
   try {
-    text = fs.readFileSync(solFile, 'utf-8');
+    text = clean(fs.readFileSync(solFile, 'utf-8'));
   } catch {
     return;
   }
@@ -116,6 +153,7 @@ function root4import(cwd) {
 // ---- 语法检查（静默运行，结果画成波浪线）----
 function check(doc) {
   if (doc.isDirty) return; // 只查已保存到磁盘的内容
+  if (!canExecute()) return; // 未信任工作区：不执行任何进程
   const root = projectRoot(doc);
   cp.execFile(
     pythonPath(root),
@@ -125,7 +163,7 @@ function check(doc) {
       env: { ...process.env, PYTHONPATH: root4import(root), PYTHONIOENCODING: 'utf-8' },
     },
     (err, stdout, stderr) => {
-      const out = (stdout || '').toString();
+      const out = clean((stdout || '').toString());
       const list = [];
       if (err) {
         const m = out.match(/^(.+):(\d+):(\d+): (.+)$/m);
@@ -134,11 +172,11 @@ function check(doc) {
           const col = Math.max(0, parseInt(m[3], 10) - 1);
           list.push(new vscode.Diagnostic(
             new vscode.Range(line, col, line, col + 1),
-            m[4], vscode.DiagnosticSeverity.Error));
+            clean(m[4]), vscode.DiagnosticSeverity.Error));
         } else {
           list.push(new vscode.Diagnostic(
             new vscode.Range(0, 0, 0, 1),
-            out.trim() || (stderr || '').toString().trim() || '语法检查失败',
+            out.trim() || clean((stderr || '').toString()).trim() || '语法检查失败',
             vscode.DiagnosticSeverity.Error));
         }
       }
@@ -165,6 +203,7 @@ async function activeLingoDoc() {
 }
 
 async function solve(backend) {
+  if (!canExecute()) return refuseExecution('求解');
   const doc = await activeLingoDoc();
   if (!doc) return;
   const root = projectRoot(doc);
@@ -174,6 +213,7 @@ async function solve(backend) {
 }
 
 async function solveGlpsol() {
+  if (!canExecute()) return refuseExecution('求解');
   const doc = await activeLingoDoc();
   if (!doc) return;
   const root = projectRoot(doc);
@@ -189,6 +229,7 @@ async function solveGlpsol() {
 }
 
 async function translate(backend) {
+  if (!canExecute()) return refuseExecution('翻译');
   const doc = await activeLingoDoc();
   if (!doc) return;
   const root = projectRoot(doc);

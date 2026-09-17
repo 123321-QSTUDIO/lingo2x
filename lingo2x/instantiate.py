@@ -5,7 +5,8 @@ LP 文件后端和 scipy 后端都基于 FlatLP；GMPL 后端不需要它（保�
 from dataclasses import dataclass, field
 from itertools import product
 
-from .model import Num, Ref, Bin, Neg, Sum, IVar, QCmp, QAnd, QOr, QNot, analyze
+from .model import (Num, Ref, Bin, Neg, Sum, IVar, QCmp, QAnd, QOr, QNot,
+                    analyze, MAX_INSTANCES)
 
 
 class InstantiateError(Exception):
@@ -94,6 +95,10 @@ class Flattener:
                 self.kind[key] = {'bin': 'bin', 'gin': 'int'}.get(kd, 'cont')
                 if kd == 'free':
                     self.free.add(key)
+                if len(self.keys) > MAX_INSTANCES:
+                    raise InstantiateError(
+                        f"变量实例总数超过上限 {MAX_INSTANCES}（防内存耗尽）；"
+                        "请缩小集合规模或拆分模型")
 
     def _instances(self, dom):
         if not dom:
@@ -191,8 +196,11 @@ class Flattener:
 
     @staticmethod
     def _label(key):
+        """变量实例 → 标签。各组件先转义 '_' 再拼接，保证单射：
+        成员 'A_B'（X_A__B）与成员对 ('A','B')（X_A_B）不再混淆。"""
         name, inst = key
-        return name if not inst else f"{name}_{'_'.join(inst)}"
+        parts = [name] + [str(p) for p in inst]
+        return '_'.join(p.replace('_', '__') for p in parts)
 
     def flatten(self):
         m = self.m
@@ -211,6 +219,10 @@ class Flattener:
                     suffix = '_'.join(_normkey(env[v]) for v, _ in c.domain)
                     base = f"{base}_{suffix}"
                 rows.append((base, coef, c.op, -diff.const))
+                if len(rows) > MAX_INSTANCES:
+                    raise InstantiateError(
+                        f"约束展开行数超过上限 {MAX_INSTANCES}（防内存耗尽）；"
+                        "请缩小集合规模或拆分模型")
         labels = {key: self._label(key) for key in self.keys}
         return FlatLP(m.sense, self.keys, self.kind, self.free, obj.coef, rows, labels)
 

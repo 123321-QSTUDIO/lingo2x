@@ -15,7 +15,8 @@ import re
 
 from .lexer import tokenize
 from .model import (Model, SetDef, Constraint, Num, Ref, Bin, Neg, Sum,
-                    IVar, QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall)
+                    IVar, QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall,
+                    validate_member, MAX_SET_MEMBERS)
 
 
 class ParseError(Exception):
@@ -38,6 +39,18 @@ class Parser:
         self._canon = {}      # 大写名字 → 首次出现的写法（LINGO 大小写不敏感）
         self._fresh = 0       # 隐式下标变量计数器
         self._ctx = []        # 隐式下标上下文栈：元素为 domain 元组
+        self._depth = 0       # 表达式/条件式递归深度（防栈溢出）
+
+    _MAX_DEPTH = 200
+
+    def _enter(self, what):
+        self._depth += 1
+        if self._depth > self._MAX_DEPTH:
+            self._depth -= 1
+            raise ParseError(f"{what}嵌套过深（超过 {self._MAX_DEPTH} 层），疑似畸形输入")
+
+    def _leave(self):
+        self._depth -= 1
 
     # ---- 基础工具 ----
     def peek(self, k=0):
@@ -172,14 +185,21 @@ class Parser:
                     raise ParseError(f"区间右端应为标识符或数字，得到 {t2[1]!r}（位置 {t2[2]}）")
                 out.extend(self._expand_range(t[1], t2[1]))
             else:
-                out.append(t[1])
+                out.append(validate_member(t[1]))
+            if len(out) > MAX_SET_MEMBERS:
+                self.err(f"集合成员数超过上限 {MAX_SET_MEMBERS}（防内存耗尽）")
         return out
 
     def _expand_range(self, a, b):
         if re.fullmatch(r'\d+', a) and re.fullmatch(r'\d+', b):
+            if len(a) > 9 or len(b) > 9:
+                self.err(f"区间 {a}..{b} 端点过大")
             lo, hi = int(a), int(b)
             if lo > hi:
                 self.err(f"区间 {a}..{b} 左端大于右端")
+            if hi - lo + 1 > MAX_SET_MEMBERS:
+                self.err(f"区间 {a}..{b} 展开后有 {hi - lo + 1} 个成员，"
+                         f"超过上限 {MAX_SET_MEMBERS}（防内存耗尽）")
             return [str(i) for i in range(lo, hi + 1)]
         for table in (_DAYS, _MONTHS):
             ua, ub = a.upper(), b.upper()
@@ -256,7 +276,10 @@ class Parser:
             sd = self.m.sets[name]
             if sd.parents:
                 self.err(f"派生集 {name} 不能在 DATA 中定义成员")
-            mems = [self._member_str(v) for v in sub]
+            if len(sub) > MAX_SET_MEMBERS:
+                self.err(f"集合 {name} 成员数超过上限 {MAX_SET_MEMBERS}（防内存耗尽）")
+            mems = [validate_member(self._member_str(v), where=f'（集合 {name} 的 DATA）')
+                    for v in sub]
             if sd.members and sd.members != mems:
                 self.err(f"集合 {name} 的成员重复定义且不一致")
             sd.members = mems
@@ -457,11 +480,15 @@ class Parser:
         return self._qor()
 
     def _qor(self):
-        e = self._qand()
-        while self.at_op('#OR#'):
-            self.next()
-            e = QOr(e, self._qand())
-        return e
+        self._enter('条件过滤式')
+        try:
+            e = self._qand()
+            while self.at_op('#OR#'):
+                self.next()
+                e = QOr(e, self._qand())
+            return e
+        finally:
+            self._leave()
 
     def _qand(self):
         e = self._qnot()
@@ -487,11 +514,15 @@ class Parser:
 
     # ---- 下标表达式（下标变量与数字的算术）----
     def _idx_expr(self):
-        e = self._idx_term()
-        while self.at_op('+', '-'):
-            op = self.next()[1]
-            e = Bin(op, e, self._idx_term())
-        return e
+        self._enter('下标表达式')
+        try:
+            e = self._idx_term()
+            while self.at_op('+', '-'):
+                op = self.next()[1]
+                e = Bin(op, e, self._idx_term())
+            return e
+        finally:
+            self._leave()
 
     def _idx_term(self):
         e = self._idx_atom()
@@ -516,11 +547,15 @@ class Parser:
 
     # ---- 表达式（优先级：加减 < 乘除 < 一元负号 < 原子）----
     def expr(self):
-        e = self.term()
-        while self.at_op('+', '-'):
-            op = self.next()[1]
-            e = Bin(op, e, self.term())
-        return e
+        self._enter('表达式')
+        try:
+            e = self.term()
+            while self.at_op('+', '-'):
+                op = self.next()[1]
+                e = Bin(op, e, self.term())
+            return e
+        finally:
+            self._leave()
 
     def term(self):
         e = self.factor()

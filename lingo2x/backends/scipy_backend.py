@@ -13,6 +13,7 @@ def solve(model):
     try:
         import numpy as np
         import scipy
+        from scipy import sparse
         from scipy.optimize import linprog
     except ImportError:
         raise BackendError("scipy 后端需要 numpy 和 scipy：pip install numpy scipy")
@@ -27,20 +28,31 @@ def solve(model):
     if f.sense == 'max':
         c = -c
 
-    Aub, bub, Aeq, beq = [], [], [], []
+    # 稀疏装配：稠密行向量的内存是 行数×列数，稀疏三元组只随非零元增长
+    ub_list, eq_list = [], []
     for _nm, coef, op, rhs in f.rows:
-        row = np.zeros(n)
-        for k, v in coef.items():
-            row[pos[k]] = v
-        if op == '<=':
-            Aub.append(row)
-            bub.append(rhs)
-        elif op == '>=':
-            Aub.append(-row)
-            bub.append(-rhs)
+        if op == '=':
+            eq_list.append((coef, rhs))
+        elif op == '<=':
+            ub_list.append((coef, rhs))
         else:
-            Aeq.append(row)
-            beq.append(rhs)
+            ub_list.append(({k: -v for k, v in coef.items()}, -rhs))
+
+    def to_csr(lst):
+        if not lst:
+            return None, None
+        ri, ci, vv, bb = [], [], [], []
+        for coef, rhs in lst:
+            r = len(bb)
+            for k, v in coef.items():
+                ri.append(r)
+                ci.append(pos[k])
+                vv.append(v)
+            bb.append(rhs)
+        return sparse.csr_matrix((vv, (ri, ci)), shape=(len(bb), n)), np.array(bb)
+
+    A_ub, b_ub = to_csr(ub_list)
+    A_eq, b_eq = to_csr(eq_list)
 
     bounds = []
     for k in f.keys:
@@ -58,11 +70,7 @@ def solve(model):
             raise BackendError(f"整数/0-1 变量需要 scipy >= 1.9，当前 {scipy.__version__}")
         integrality = np.array([0 if f.kind[k] == 'cont' else 1 for k in f.keys])
 
-    res = linprog(c,
-                  A_ub=np.array(Aub) if Aub else None,
-                  b_ub=np.array(bub, dtype=float) if bub else None,
-                  A_eq=np.array(Aeq) if Aeq else None,
-                  b_eq=np.array(beq, dtype=float) if beq else None,
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
                   bounds=bounds, integrality=integrality, method='highs')
     obj = None
     if res.fun is not None:

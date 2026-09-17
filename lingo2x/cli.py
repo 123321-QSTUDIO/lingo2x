@@ -20,7 +20,7 @@ def _check(path):
         msg = str(e)
         m = re.search(r'位置 (\d+)', msg)
         if m:
-            off = int(m.group(1))
+            off = min(int(m.group(1)), len(text))
             line = text.count('\n', 0, off) + 1
             col = off - text.rfind('\n', 0, off)
             print(f'{path}:{line}:{col}: {msg}')
@@ -32,6 +32,21 @@ def _check(path):
 
 
 def main(argv=None):
+    from .lexer import LexError
+    from .parser import ParseError
+    from .model import ModelError
+    from .instantiate import InstantiateError
+    from .backends import scipy_backend
+    try:
+        return _main(argv)
+    except (LexError, ParseError, ModelError, InstantiateError,
+            scipy_backend.BackendError) as e:
+        # 预期的输入类错误：打印干净的一行错误，不抛 traceback
+        print(f'错误: {e}', file=sys.stderr)
+        return 1
+
+
+def _main(argv=None):
     try:
         sys.stdout.reconfigure(encoding='utf-8')
     except Exception:

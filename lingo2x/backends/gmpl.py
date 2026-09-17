@@ -69,7 +69,9 @@ class _Emitter:
 
     def emit(self):
         m, sy = self.m, self.sy
-        L = [f"/* 由 lingo2x 从 {m.source or 'stdin'} 生成 */", ""]
+        # 来源路径进了注释：中和块注释分隔符与换行，防注释逃逸
+        src = (m.source or 'stdin').replace('*/', '* /').replace('\n', ' ')
+        L = [f"/* 由 lingo2x 从 {src} 生成 */", ""]
         for name, sd in m.sets.items():
             if not sd.parents:
                 L.append(f"set {name};")

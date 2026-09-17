@@ -8,7 +8,10 @@
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages", "Other"],
   "capabilities": {
-    "untrustedWorkspaces": { "supported": true }
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "受限模式下仅提供语法高亮等声明式功能；语法检查/求解/翻译会启动外部进程，仅在受信任的工作区中启用。"
+    }
   },
   "activationEvents": ["onLanguage:lingo"],
   "main": "./extension.js",

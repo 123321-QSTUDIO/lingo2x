@@ -21,7 +21,9 @@ def _terms(coef, labels):
 
 def emit(model):
     f = flatten(model)
-    L = [f"\\* 由 lingo2x 从 {model.source or 'stdin'} 生成 *\\"]
+    # 来源路径进了注释：中和块注释分隔符与换行，防注释逃逸
+    src = (model.source or 'stdin').replace('*\\', '* \\').replace('\n', ' ')
+    L = [f"\\* 由 lingo2x 从 {src} 生成 *\\"]
     L.append('Maximize' if f.sense == 'max' else 'Minimize')
     L.append(f" obj: {_terms(f.obj, f.labels)}")
     L.append('Subject To')

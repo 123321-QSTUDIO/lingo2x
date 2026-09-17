@@ -9,10 +9,12 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GLPSOL = os.environ.get('GLPSOL', os.path.join(ROOT, 'tools', 'glpk-4.65', 'w64', 'glpsol.exe'))
-TMP = os.environ.get('TEMP', r'C:\Windows\Temp')
+# 每次运行在独立临时目录里写求解器工件，避免共享目录下可预测的固定文件名
+TMP = tempfile.mkdtemp(prefix='lingo2x_cmp_')
 PY = sys.executable
 
 
