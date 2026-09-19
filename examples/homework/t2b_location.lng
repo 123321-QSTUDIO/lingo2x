@@ -1,0 +1,20 @@
+MODEL:
+! 高阶挑战（离散候选版）：在 6 个工地位置中选 2 处建新料场（各 20t），总吨千米最小;
+SETS:
+    SITES /1..6/: SX, SY, D, Y;
+    LINKS(SITES, SITES): DIST, X;
+ENDSETS
+DATA:
+    SX  = 1.25, 8.75, 0.5, 5.75, 3, 7.25;
+    SY  = 1.25, 0.75, 4.75, 5, 6.5, 7.75;
+    D   = 3, 5, 4, 7, 6, 11;
+ENDDATA
+CALC:
+    @FOR(LINKS(i,j): DIST(i,j) = @SQRT((SX(i)-SX(j))*(SX(i)-SX(j)) + (SY(i)-SY(j))*(SY(i)-SY(j))));
+ENDCALC
+MIN = @SUM(LINKS(i,j): DIST(i,j) * X(i,j));
+@SUM(SITES(i): Y(i)) = 2;
+@FOR(SITES(i): @BIN(Y(i)));
+@FOR(SITES(i): @SUM(SITES(j): X(i,j)) <= 20 * Y(i));  ! 未选址不发货，选址限 20t;
+@FOR(SITES(j): @SUM(SITES(i): X(i,j)) = D(j));
+END

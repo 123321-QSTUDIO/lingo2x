@@ -1,0 +1,23 @@
+MODEL:
+! 题目2 运输问题：料场 A(5,1)、B(2,7) 各储 20t，向 6 个工地送水泥，总吨千米最小;
+SETS:
+    SITES  /1..6/: SX, SY, D;
+    DEPOTS /A, B/: DX, DY, CAP;
+    LINKS(DEPOTS, SITES): DIST, X;
+ENDSETS
+DATA:
+    SX  = 1.25, 8.75, 0.5, 5.75, 3, 7.25;
+    SY  = 1.25, 0.75, 4.75, 5, 6.5, 7.75;
+    D   = 3, 5, 4, 7, 6, 11;
+    DX  = 5, 2;
+    DY  = 1, 7;
+    CAP = 20, 20;
+ENDDATA
+CALC:
+    ! 直线距离：DIST = sqrt((DX-SX)^2 + (DY-SY)^2)，CALC 段先算成参数;
+    @FOR(LINKS(i,j): DIST(i,j) = @SQRT((DX(i)-SX(j))*(DX(i)-SX(j)) + (DY(i)-SY(j))*(DY(i)-SY(j))));
+ENDCALC
+MIN = @SUM(LINKS(i,j): DIST(i,j) * X(i,j));
+@FOR(DEPOTS(i): @SUM(SITES(j): X(i,j)) <= CAP(i));
+@FOR(SITES(j):  @SUM(DEPOTS(i): X(i,j)) = D(j));
+END

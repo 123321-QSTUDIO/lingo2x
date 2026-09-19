@@ -1,0 +1,26 @@
+MODEL:
+! 题目3 糖果问题：三种原料配两种糖果，最大利润;
+! X(i,j) = 原料 i 在糖果 j 中的用量(kg);
+SETS:
+    ING   /A, B, C/: SUPPLY, COST;
+    CANDY /A1, A2/:  PRICE, MINDEM;
+    MIX(ING, CANDY): X;
+ENDSETS
+DATA:
+    SUPPLY = 600, 750, 625;
+    COST   = 20, 12, 8;
+    PRICE  = 24, 15;
+    MINDEM = 600, 800;
+ENDDATA
+MAX = @SUM(CANDY(j): PRICE(j) * @SUM(ING(i): X(i,j)))
+    - @SUM(MIX(i,j): COST(i) * X(i,j));
+@FOR(ING(i):   @SUM(CANDY(j): X(i,j)) <= SUPPLY(i));
+@FOR(CANDY(j): @SUM(ING(i): X(i,j)) >= MINDEM(j));
+! 成分约束（线性化：占该糖果总量的比例）;
+X(A,A1) >= 0.5  * @SUM(ING(i): X(i,A1));   ! 高级奶糖 A >= 50%;
+X(B,A1) >= 0.25 * @SUM(ING(i): X(i,A1));   ! 高级奶糖 B >= 25%;
+X(C,A1) <= 0.1  * @SUM(ING(i): X(i,A1));   ! 高级奶糖 C <= 10%;
+X(A,A2) <= 0.4  * @SUM(ING(i): X(i,A2));   ! 水果糖 A <= 40%;
+X(B,A2) <= 0.4  * @SUM(ING(i): X(i,A2));   ! 水果糖 B <= 40%;
+X(C,A2) >= 0.15 * @SUM(ING(i): X(i,A2));   ! 水果糖 C >= 15%;
+END

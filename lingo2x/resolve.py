@@ -9,6 +9,7 @@
 - 打开 xlsx 前做 zip 炸弹预检（未压缩总大小 / 压缩比阈值）；
 - 写回 Excel 前会把解析后的绝对路径打印出来。
 """
+import math
 import os
 import sys
 import zipfile
@@ -16,7 +17,7 @@ from itertools import product
 
 from .model import (ModelError, Num, Ref, Bin, Neg, Sum, IVar,
                     QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall,
-                    validate_member, MAX_SET_MEMBERS)
+                    Func, validate_member, MAX_SET_MEMBERS)
 from .instantiate import _normkey, _tonum
 
 # zip 炸弹预检阈值
@@ -303,6 +304,15 @@ def _eval_const(model, e, env, values):
             if e.qual is None or _eval_qual(e.qual, env2):
                 total += _eval_const(model, e.body, env2, values)
         return total
+    if isinstance(e, Func):
+        v = _eval_const(model, e.arg, env, values)
+        if e.name == 'sqrt':
+            if v < 0:
+                raise ModelError("CALC 中 @SQRT 的参数为负")
+            return math.sqrt(v)
+        if e.name == 'abs':
+            return abs(v)
+        raise ModelError(f"CALC 中暂不支持函数 @{e.name.upper()}")
     raise ModelError(f"CALC 中出现不支持的表达式节点 {type(e).__name__}")
 
 

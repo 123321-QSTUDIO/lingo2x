@@ -1,0 +1,19 @@
+MODEL:
+! 题目1 食谱问题：最小费用满足每日营养需求（蛋白质50g/维生素A 4000IU/钙1000mg）;
+SETS:
+    FOODS /apple, banana, carrot, jujube, egg/: PROTEIN, VITA, CALCIUM, COST, X;
+ENDSETS
+DATA:
+    PROTEIN = 0.3, 1.2, 0.7, 3.5, 5.5;
+    VITA    = 73, 96, 20253, 890, 279;
+    CALCIUM = 9.6, 7, 19, 57, 22;
+    COST    = 10, 15, 5, 60, 8;
+    NEED_P = 50;
+    NEED_V = 4000;
+    NEED_C = 1000;
+ENDDATA
+MIN = @SUM(FOODS(i): COST(i) * X(i));
+[protein] @SUM(FOODS(i): PROTEIN(i) * X(i)) >= NEED_P;
+[vitA]    @SUM(FOODS(i): VITA(i) * X(i))    >= NEED_V;
+[calcium] @SUM(FOODS(i): CALCIUM(i) * X(i)) >= NEED_C;
+END

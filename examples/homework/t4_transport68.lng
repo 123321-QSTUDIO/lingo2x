@@ -1,0 +1,21 @@
+MODEL:
+! 题目4 运输利润问题：6 产地 → 8 销地最小运费（产大于销，产地不强制发完）;
+SETS:
+    SRC /A1, A2, A3, A4, A5, A6/: SUPPLY;
+    DST /B1, B2, B3, B4, B5, B6, B7, B8/: DEMAND;
+    LINKS(SRC, DST): COST, X;
+ENDSETS
+DATA:
+    SUPPLY = 60, 55, 51, 43, 41, 52;
+    DEMAND = 35, 37, 22, 32, 41, 32, 43, 38;
+    COST   = 6, 2, 6, 7, 4, 2, 5, 9,
+             4, 9, 5, 3, 8, 5, 8, 2,
+             5, 2, 1, 9, 7, 4, 3, 3,
+             7, 6, 7, 3, 9, 2, 7, 1,
+             2, 3, 9, 5, 7, 2, 6, 5,
+             5, 5, 2, 2, 8, 1, 4, 3;
+ENDDATA
+MIN = @SUM(LINKS(i,j): COST(i,j) * X(i,j));
+@FOR(SRC(i): @SUM(DST(j): X(i,j)) <= SUPPLY(i));
+@FOR(DST(j): @SUM(SRC(i): X(i,j)) = DEMAND(j));
+END

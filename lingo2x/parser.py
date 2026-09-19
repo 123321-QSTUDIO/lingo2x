@@ -16,7 +16,7 @@ import re
 from .lexer import tokenize
 from .model import (Model, SetDef, Constraint, Num, Ref, Bin, Neg, Sum,
                     IVar, QCmp, QAnd, QOr, QNot, CalcAssign, CalcFor, CalcCall,
-                    validate_member, MAX_SET_MEMBERS)
+                    Func, validate_member, MAX_SET_MEMBERS)
 
 
 class ParseError(Exception):
@@ -576,6 +576,13 @@ class Parser:
         if t[0] == 'NUM':
             return Num(float(t[1]), t[1])
         if t[0] == 'AT':
+            if t[1].upper() in ('@SQRT', '@ABS'):
+                # 数值函数：仅在 CALC 段可求值；在目标/约束中会被实例化器拒绝
+                # （AT token 已在 primary() 开头被消费，不再 next）
+                self.expect_op('(')
+                arg = self.expr()
+                self.expect_op(')')
+                return Func(t[1].upper()[1:].lower(), arg)
             if t[1].upper() != '@SUM':
                 raise ParseError(f"表达式中暂不支持函数 {t[1].upper()}（位置 {t[2]}）")
             self.expect_op('(')

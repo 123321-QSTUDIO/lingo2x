@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from itertools import product
 
 from .model import (Num, Ref, Bin, Neg, Sum, IVar, QCmp, QAnd, QOr, QNot,
-                    analyze, MAX_INSTANCES)
+                    Func, analyze, MAX_INSTANCES)
 
 
 class InstantiateError(Exception):
@@ -192,6 +192,10 @@ class Flattener:
             for env2 in self._combos(e.domain, e.qual, env):
                 out.add(self.eval(e.body, env2))
             return out
+        if isinstance(e, Func):
+            raise InstantiateError(
+                f"@{e.name.upper()} 是非线性函数，只能用于 CALC 段计算参数；"
+                "目标/约束中不允许出现（本工具只解线性模型）")
         raise InstantiateError(f"未知表达式节点 {type(e).__name__}")
 
     @staticmethod

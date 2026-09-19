@@ -74,6 +74,14 @@ class Neg(Expr):
     x: Expr = None
 
 
+@dataclass
+class Func(Expr):
+    """数值函数（@SQRT/@ABS），只允许出现在 CALC 段（数据计算），
+    出现在目标/约束中会被实例化器拒绝（保持模型线性）。"""
+    name: str = ""
+    arg: Expr = None
+
+
 # ---- 条件过滤式（@SUM/@FOR 的 | 条件）----
 
 @dataclass

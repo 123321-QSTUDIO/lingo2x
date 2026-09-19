@@ -1,6 +1,6 @@
 """GMPL (GNU MathProg) 后端：保持符号形式输出 .mod，用 glpsol 求解。"""
 from ..model import (Num, Ref, Bin, Neg, Sum, IVar, QCmp, QAnd, QOr, QNot,
-                     analyze, ModelError)
+                     Func, analyze, ModelError)
 
 _CMP = {'<=': '<=', '>=': '>=', '=': '=', '!=': '<>', '<': '<', '>': '>'}
 
@@ -65,6 +65,10 @@ class _Emitter:
             return f"({self.expr(e.l)} {e.op} {self.expr(e.r)})"
         if isinstance(e, Sum):
             return f"sum{{{self._iter(e.domain, e.qual)}}} ({self.expr(e.body)})"
+        if isinstance(e, Func):
+            raise ModelError(
+                f"@{e.name.upper()} 是非线性函数，只能用于 CALC 段计算参数；"
+                "GMPL 输出只支持线性模型")
         raise TypeError(type(e).__name__)
 
     def emit(self):
