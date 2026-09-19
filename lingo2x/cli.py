@@ -61,6 +61,8 @@ def _main(argv=None):
                     help='输出文件；默认与输入同名换扩展名；"-" 表示输出到屏幕')
     ap.add_argument('--check', action='store_true',
                     help='只做语法检查；错误以 "文件:行:列: 消息" 格式输出（供编辑器调用）')
+    ap.add_argument('--all', action='store_true',
+                    help='求解时打印全部变量（默认只打印非零变量）')
     args = ap.parse_args(argv)
 
     if args.check:
@@ -75,10 +77,11 @@ def _main(argv=None):
         r = be.solve(m)
         print(f"状态: {r['message']}")
         if r['success']:
-            print(f"最优值: {r['objective']:g}")
-            for k, v in r['values'].items():
-                if abs(v) > 1e-9:
-                    print(f"  {k} = {v:g}")
+            print(f"最优值: {r['objective']:.10g}")
+            items = sorted(r['values'].items())
+            for k, v in items:
+                if args.all or abs(v) > 1e-9:
+                    print(f"  {k} = {v:.10g}")
         return 0 if r['success'] else 1
 
     if m.ole_writes:

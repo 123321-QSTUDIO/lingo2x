@@ -1,0 +1,2 @@
+[console_scripts]
+lingo2x = lingo2x.cli:main

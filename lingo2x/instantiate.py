@@ -129,6 +129,8 @@ class Flattener:
                 return a - b
             if e.op == '*':
                 return a * b
+            if e.op == '^':
+                return a ** b
             if b == 0:
                 raise InstantiateError("下标表达式除以 0")
             return a / b
@@ -186,7 +188,17 @@ class Flattener:
                 return a.add(b, -1.0)
             if e.op == '*':
                 return _mul(a, b)
-            return _div(a, b)
+            if e.op == '/':
+                return _div(a, b)
+            if e.op == '^':
+                if a.coef or b.coef:
+                    raise InstantiateError(
+                        "幂运算 ^ 只支持常数底数与常数指数（保持模型线性）")
+                try:
+                    return LinExpr(const=a.const ** b.const)
+                except (OverflowError, ZeroDivisionError):
+                    raise InstantiateError("幂运算结果溢出或 0 的负次幂")
+            raise InstantiateError(f"未知运算符 {e.op}")
         if isinstance(e, Sum):
             out = LinExpr()
             for env2 in self._combos(e.domain, e.qual, env):

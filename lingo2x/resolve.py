@@ -92,6 +92,17 @@ def _range_cells(wb, ref, fname):
             target = dn.value
             break
     if target is None:
+        # 不是命名区域：必须是合法的单元格/区域引用，否则大概率是用户笔误，
+        # 要直接报"找不到命名区域"，而不是把 'CX' 当整列解析出莫名其妙的错误
+        import re as _re
+        cell_pat = _re.compile(
+            r"^(?:'[^']+'|[A-Za-z0-9_一-鿿]+!)?\$?[A-Za-z]{1,3}\$?\d+"
+            r"(?::\$?[A-Za-z]{1,3}\$?\d+)?$")
+        if not cell_pat.match(ref):
+            names = ', '.join(wb.defined_names.keys()) or '（无）'
+            raise ModelError(
+                f"@OLE 在 {fname} 中找不到命名区域 {ref!r}，它也不是合法的"
+                f"单元格区域写法（如 'Sheet1!A1:B2'）。工作簿现有命名区域：{names}")
         target = ref
     if '!' in target:
         sheet, cr = target.split('!', 1)
@@ -248,6 +259,8 @@ def _eval_idx(e, env):
             return a - b
         if e.op == '*':
             return a * b
+        if e.op == '^':
+            return a ** b
         if b == 0:
             raise ModelError("CALC 下标表达式除以 0")
         return a / b
@@ -294,6 +307,11 @@ def _eval_const(model, e, env, values):
             if b == 0:
                 raise ModelError("CALC 中除以 0")
             return a / b
+        if e.op == '^':
+            try:
+                return a ** b
+            except (OverflowError, ZeroDivisionError):
+                raise ModelError("CALC 中幂运算溢出或 0 的负次幂")
         return {'+': a + b, '-': a - b, '*': a * b}[e.op]
     if isinstance(e, Sum):
         total = 0.0

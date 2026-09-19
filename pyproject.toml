@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lingo2x"
+version = "0.2.0"
+description = "用 LINGO 语法写数学规划模型，用开源求解器跑"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+
+# 可选依赖：scipy 后端与 @OLE 支持
+[project.optional-dependencies]
+solve = ["numpy", "scipy>=1.9"]
+excel = ["openpyxl"]
+all = ["numpy", "scipy>=1.9", "openpyxl"]
+
+[project.scripts]
+lingo2x = "lingo2x.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lingo2x*"]

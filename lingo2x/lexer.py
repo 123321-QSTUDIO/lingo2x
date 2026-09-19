@@ -1,7 +1,8 @@
 """LINGO 词法分析：源码 → token 流。
 
 token = (kind, value, pos)，kind ∈ AT / NUM / ID / STR / OP / EOF。
-注释：! 到下一个分号（与 LINGO 一致）。
+注释：`!` 行内有分号则到分号；否则看下一条非空行——像散文则按真 LINGO
+多行注释延续到分号，像代码则到行尾（兼容教学文件的单行写法）。
 比较/逻辑运算符 #LE# 等归一为 OP，值保留大写原形（如 '#LE#'）。
 """
 import re
@@ -17,7 +18,18 @@ _RE_ID = re.compile(r'[A-Za-z_][A-Za-z0-9_]*')
 _RE_HASH = re.compile(r'#[A-Za-z]+#')
 
 _OPS2 = ('<=', '>=', '..')
-_OPS1 = '=<>+-*/(),;:|[]&'
+_OPS1 = '=<>+-*/(),;:|[]&^'
+
+# 判断一行是否"像代码"（用于多行注释边界的启发式）：
+# 关键字/@函数/约束标签开头，或"标识符紧跟 = ( / : ]"，或数字开头
+_RE_KW_LINE = re.compile(
+    r'^\s*(?:@|\[|(?:MODEL|SETS|ENDSETS|DATA|ENDDATA|CALC|ENDCALC'
+    r'|PROCEDURE|ENDPROCEDURE|END|MAX|MIN)\b|[^\S\n]*\d)', re.I)
+_RE_STMT_LINE = re.compile(r'^\s*[A-Za-z_][A-Za-z0-9_]*[=(/:\]]')
+
+
+def _looks_like_code(line):
+    return bool(_RE_KW_LINE.search(line) or _RE_STMT_LINE.search(line))
 
 
 def tokenize(text):
@@ -29,13 +41,27 @@ def tokenize(text):
             i += 1
             continue
         if c == '!':                        # 注释：! ... ;
-            # 兼容教学文件的写法：注释结束于本行的分号；若本行没有分号则到行尾
             j = text.find(';', i)
             nl = text.find('\n', i)
             if j >= 0 and (nl < 0 or j < nl):
-                i = j + 1
+                i = j + 1                    # 本行有分号 → 注释到分号
+                continue
+            # 本行无分号：看下一条非空行。
+            # 像散文 → 真 LINGO 多行注释，延续到分号；
+            # 像代码 → 兼容教学文件的单行写法，注释到行尾
+            k = nl + 1 if nl >= 0 else n
+            probe = k
+            line = ''
+            while probe < n:
+                eol = text.find('\n', probe)
+                line = text[probe:eol if eol >= 0 else n]
+                if line.strip():
+                    break
+                probe = eol + 1 if eol >= 0 else n
+            if probe >= n or not _looks_like_code(line):
+                i = j + 1 if j >= 0 else n   # 多行注释 → 到分号
             else:
-                i = n if nl < 0 else nl + 1
+                i = k                        # 单行注释 → 到行尾
             continue
         if c in '\'"':
             j = text.find(c, i + 1)

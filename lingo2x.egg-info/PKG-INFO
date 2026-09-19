@@ -1,3 +1,22 @@
+Metadata-Version: 2.4
+Name: lingo2x
+Version: 0.2.0
+Summary: 用 LINGO 语法写数学规划模型，用开源求解器跑
+License: MIT
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: solve
+Requires-Dist: numpy; extra == "solve"
+Requires-Dist: scipy>=1.9; extra == "solve"
+Provides-Extra: excel
+Requires-Dist: openpyxl; extra == "excel"
+Provides-Extra: all
+Requires-Dist: numpy; extra == "all"
+Requires-Dist: scipy>=1.9; extra == "all"
+Requires-Dist: openpyxl; extra == "all"
+Dynamic: license-file
+
 # lingo2x
 
 **用 LINGO 语法写数学规划模型，用开源求解器跑。** 不用装 LINGO。
@@ -29,14 +48,13 @@ LINGO 源码 (.lng/.lgo) → 解析器 → 中间模型 (IR) → 可插拔求解
 ## 快速开始
 
 ```bash
-# 准备隔离环境并以可编辑模式安装（装完任意目录都能用 lingo2x 命令）
+# 准备隔离环境（scipy 后端与 @OLE 所需）
 python -m venv .venv
-.venv/Scripts/python -m pip install -e .[all]   # Windows
-# .venv/bin/python -m pip install -e '.[all]'   # Linux/macOS
+.venv/Scripts/python -m pip install numpy scipy openpyxl   # Windows
+# .venv/bin/python -m pip install numpy scipy openpyxl     # Linux/macOS
 
-# 直接求解示例模型
-.venv/Scripts/lingo2x examples/transportation.lgo -b scipy
-# 或不装也行：在项目根目录 .venv/Scripts/python -m lingo2x 模型.lng -b scipy
+# 写一个模型（examples/transportation.lgo），然后直接求解
+.venv/Scripts/python -m lingo2x examples/transportation.lgo -b scipy
 ```
 
 输出：
@@ -87,12 +105,11 @@ END
 
 | 支持 | 不支持（会明确报错） |
 | --- | --- |
-| 线性 LP / MIP / 0-1 规划 | 非线性表达式（变量×变量、变量幂） |
-| `^` 幂运算（常数底数与指数） | 派生集 `\|` 成员过滤（`&1 #LE# &2`） |
-| `@SUM`/`@FOR` 的 `\|` 条件过滤（`#AND#` 等） | `@POINTER` / `@FILE` 外部数据 |
-| `@OLE` 读写 Excel（需 openpyxl） | `@PPOISCDF` 等概率分布函数 |
-| `CALC:` / `procedure` 参数计算（含 `@SQRT/@ABS`） | `@BND`（暂以变量默认界代替） |
-| 隐式下标、下标算术 `X(i-1)` | 下标与外层重名（直接报错，防静默算错） |
+| 线性 LP / MIP / 0-1 规划 | 非线性表达式（变量×变量） |
+| `@SUM`/`@FOR` 的 `\|` 条件过滤（`#AND#` 等） | 派生集 `\|` 成员过滤（`&1 #LE# &2`） |
+| `@OLE` 读写 Excel（需 openpyxl） | `@POINTER` / `@FILE` 外部数据 |
+| `CALC:` / `procedure` 参数计算 | `@PPOISCDF` 等概率分布函数 |
+| 隐式下标、下标算术 `X(i-1)` | `@BND`（暂以变量默认界代替） |
 
 ## 编辑器插件（VS Code 系 IDE 通用）
 

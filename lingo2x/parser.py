@@ -430,9 +430,13 @@ class Parser:
         t = self.peek()
         if t[0] == 'AT' and t[1].upper() == '@FOR':      # 嵌套 @FOR
             self.next()
-            d2, q2 = self._for_head()
-            self.expect_op(':')
-            self._for_body(domain + d2, self._and(qual, q2))
+            self._ctx.append(domain)                   # 外层域入栈供内层遮蔽检查
+            try:
+                d2, q2 = self._for_head()
+                self.expect_op(':')
+                self._for_body(domain + d2, self._and(qual, q2))
+            finally:
+                self._ctx.pop()
             self.expect_op(')')
             return
         if t[0] == 'AT' and t[1].upper() in _KIND:       # @FOR(S(I): @BIN(X(I)))
@@ -440,8 +444,13 @@ class Parser:
             self.next()
             self.expect_op('(')
             name = self._name('变量名')
-            if self.accept_op('('):                      # 吃掉下标部分 X(I)
-                self._id_list()
+            if self.accept_op('('):                      # 吃掉下标部分（标识符或数字均可）
+                while True:
+                    tt = self.next()
+                    if tt[0] not in ('ID', 'NUM'):
+                        raise ParseError(f"下标应为标识符或数字，得到 {tt[1]!r}（位置 {tt[2]}）")
+                    if not self.accept_op(','):
+                        break
                 self.expect_op(')')
             self.expect_op(')')
             self.m.varkind[name] = _KIND[f]
@@ -473,6 +482,17 @@ class Parser:
             idx = [self._fresh_var() for _ in dom]
         if len(idx) != len(dom):
             self.err(f"集合 {setname} 是 {len(dom)} 维的，下标变量却有 {len(idx)} 个")
+        if len(set(idx)) != len(idx):
+            self.err(f"下标变量重复：{idx}")
+        # 遮蔽检测：内层下标与外层 @FOR/@SUM 下标重名会静默改变求和范围，
+        # 是"看起来能跑、结果却是错的"的最危险写法，直接拒绝
+        for iv in idx:
+            for outer in self._ctx:
+                if any(iv == v for v, _ in outer):
+                    self.err(
+                        f"下标变量 {iv} 与外层 @FOR/@SUM 的下标重名：内层会遮蔽外层，"
+                        "求和/循环范围被静默改变。请换一个不同的名字（如 "
+                        f"{iv}1），或改用嵌套写法（每层的下标名各不相同）")
         return tuple(zip(idx, dom))
 
     # ---- 条件过滤式（| 条件，支持 #AND#/#OR#/#NOT#）----
@@ -526,7 +546,7 @@ class Parser:
 
     def _idx_term(self):
         e = self._idx_atom()
-        while self.at_op('*', '/'):
+        while self.at_op('*', '/', '^'):
             op = self.next()[1]
             e = Bin(op, e, self._idx_atom())
         return e
@@ -558,18 +578,30 @@ class Parser:
             self._leave()
 
     def term(self):
-        e = self.factor()
+        e = self.unary()
         while self.at_op('*', '/'):
             op = self.next()[1]
-            e = Bin(op, e, self.factor())
+            e = Bin(op, e, self.unary())
         return e
 
-    def factor(self):
-        if self.accept_op('-'):
-            return Neg(self.factor())
-        if self.accept_op('+'):
-            return self.factor()
-        return self.primary()
+    def unary(self):
+        self._enter('表达式')
+        try:
+            if self.accept_op('-'):
+                return Neg(self.unary())
+            if self.accept_op('+'):
+                return self.unary()
+            return self.power()
+        finally:
+            self._leave()
+
+    def power(self):
+        # ^ 幂运算：只允许常数运算（实例化器保证线性），右结合
+        e = self.primary()
+        while self.at_op('^'):
+            self.next()
+            e = Bin('^', e, self.unary())
+        return e
 
     def primary(self):
         t = self.next()
