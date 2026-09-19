@@ -10,3 +10,6 @@ tools/
 *.mod
 *.lp
 *.sol.txt
+
+# 打包构建产物
+*.egg-info/
